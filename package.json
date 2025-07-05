@@ -1,0 +1,36 @@
+{
+  "name": "get-sonar-feedback",
+  "version": "1.0.0",
+  "description": "A CLI tool to fetch SonarCloud feedback for pull requests",
+  "main": "dist/index.js",
+  "bin": {
+    "get-sonar-feedback": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "sonarcloud",
+    "code-quality",
+    "cli",
+    "pull-request"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^11.1.0",
+    "node-fetch": "^2.7.0",
+    "chalk": "^4.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "@types/node-fetch": "^2.6.9",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
