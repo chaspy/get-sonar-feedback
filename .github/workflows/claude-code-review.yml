@@ -21,8 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
-      issues: read
+      pull-requests: write
+      issues: write
       id-token: write
     
     steps:
@@ -42,14 +42,30 @@ jobs:
           
           # Direct prompt for automated review (no @claude mention needed)
           direct_prompt: |
-            Please review this pull request and provide feedback on:
-            - Code quality and best practices
-            - Potential bugs or issues
-            - Performance considerations
-            - Security concerns
-            - Test coverage
-            
-            Be constructive and helpful in your feedback.
+            プルリクエストのコードレビューを日本語で実施してください。以下の観点で確認をお願いします：
+
+            ## レビュー観点
+            1. **コード品質**: 可読性、保守性、効率性
+            2. **セキュリティ**: 潜在的な脆弱性や機密情報の漏洩
+            3. **TypeScript**: 型安全性、型定義の適切性
+            4. **アーキテクチャ**: 設計原則への準拠
+            5. **テスト**: テスト可能性、テストカバレッジ
+            6. **ドキュメント**: コメント、README、型定義の十分性
+
+            ## レスポンス要件
+            - **日本語**でレビューコメントを記載してください
+            - 改善提案は具体的なコード例を含めてください
+            - 重要度（高/中/低）を明記してください
+            - 可能であれば、修正方法も提案してください
+
+            ## このプロジェクトについて
+            これはSonarCloud分析フィードバックを取得するTypeScript CLI ツールです。
+            - 単一ファイル実装（src/index.ts）
+            - SonarCloud APIとの連携
+            - GitHub APIを使用したPR自動検出機能
+            - 環境変数による設定管理
+
+            コードレビューは建設的で、学習に役立つものにしてください。
 
           # Optional: Use sticky comments to make Claude reuse the same comment on subsequent pushes to the same PR
           # use_sticky_comment: true
