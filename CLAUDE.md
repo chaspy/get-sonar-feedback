@@ -8,6 +8,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Install dependencies
 npm install
 
+# Set required environment variables
+export SONAR_TOKEN="your-sonar-token"
+export SONAR_PROJECT_KEY="your-project-key"
+export SONAR_ORGANIZATION="your-organization"
+
 # Build TypeScript to JavaScript
 npm run build
 
@@ -28,9 +33,9 @@ This is a TypeScript CLI tool that fetches SonarCloud analysis feedback for pull
 - **Single-file implementation**: All logic is contained in `src/index.ts`
 - **Main class**: `SonarCloudFeedback` handles all API interactions with SonarCloud
 - **Configuration**: 
-  - SonarCloud config via environment variables:
-    - `SONAR_PROJECT_KEY` (defaults to `studiuos-jp_Studious_JP`)
-    - `SONAR_ORGANIZATION` (defaults to `studiuos-jp`)
+  - SonarCloud config via required environment variables:
+    - `SONAR_PROJECT_KEY` (required: your SonarCloud project key)
+    - `SONAR_ORGANIZATION` (required: your SonarCloud organization)
   - GitHub config is auto-detected from git remote
 - **Authentication**:
   - Requires `SONAR_TOKEN` environment variable for SonarCloud API
