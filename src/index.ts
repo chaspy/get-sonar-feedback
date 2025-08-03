@@ -81,8 +81,8 @@ class SonarCloudFeedback {
 
   constructor() {
     this.sonarConfig = {
-      projectKey: 'studiuos-jp_Studious_JP',
-      organization: 'studiuos-jp',
+      projectKey: process.env.SONAR_PROJECT_KEY || 'studiuos-jp_Studious_JP',
+      organization: process.env.SONAR_ORGANIZATION || 'studiuos-jp',
       token: process.env.SONAR_TOKEN || ''
     };
 

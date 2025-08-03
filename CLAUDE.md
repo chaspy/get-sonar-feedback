@@ -28,7 +28,9 @@ This is a TypeScript CLI tool that fetches SonarCloud analysis feedback for pull
 - **Single-file implementation**: All logic is contained in `src/index.ts`
 - **Main class**: `SonarCloudFeedback` handles all API interactions with SonarCloud
 - **Configuration**: 
-  - SonarCloud config is hardcoded for `studiuos-jp_Studious_JP` project
+  - SonarCloud config via environment variables:
+    - `SONAR_PROJECT_KEY` (defaults to `studiuos-jp_Studious_JP`)
+    - `SONAR_ORGANIZATION` (defaults to `studiuos-jp`)
   - GitHub config is auto-detected from git remote
 - **Authentication**:
   - Requires `SONAR_TOKEN` environment variable for SonarCloud API
