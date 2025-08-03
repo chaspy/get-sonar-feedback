@@ -80,10 +80,32 @@ class SonarCloudFeedback {
   private githubConfig: GitHubConfig;
 
   constructor() {
+    // Validate required environment variables
+    const projectKey = process.env.SONAR_PROJECT_KEY;
+    const organization = process.env.SONAR_ORGANIZATION;
+    const token = process.env.SONAR_TOKEN;
+
+    const missingVars = [];
+    if (!projectKey) missingVars.push('SONAR_PROJECT_KEY');
+    if (!organization) missingVars.push('SONAR_ORGANIZATION');
+    if (!token) missingVars.push('SONAR_TOKEN');
+
+    if (missingVars.length > 0) {
+      console.error(chalk.red('Error: Missing required environment variables:'));
+      missingVars.forEach(varName => {
+        console.error(chalk.red(`  - ${varName}`));
+      });
+      console.error(chalk.yellow('\nPlease set these environment variables before running the tool:'));
+      missingVars.forEach(varName => {
+        console.error(chalk.yellow(`  export ${varName}="your-value"`));
+      });
+      process.exit(1);
+    }
+
     this.sonarConfig = {
-      projectKey: 'studiuos-jp_Studious_JP',
-      organization: 'studiuos-jp',
-      token: process.env.SONAR_TOKEN || ''
+      projectKey,
+      organization,
+      token
     };
 
     this.githubConfig = this.getGitHubConfig();
@@ -392,10 +414,6 @@ class SonarCloudFeedback {
 
   public async run(prId?: string): Promise<void> {
     try {
-      if (!this.sonarConfig.token) {
-        throw new Error('SONAR_TOKEN environment variable is not set');
-      }
-
       const pullRequestId = await this.getPullRequestId(prId);
 
       console.log(chalk.bold('\n=========================================='));

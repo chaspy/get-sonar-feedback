@@ -1,6 +1,6 @@
 {
   "name": "get-sonar-feedback",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A CLI tool to fetch SonarCloud feedback for pull requests",
   "main": "dist/index.js",
   "bin": {
@@ -17,8 +17,16 @@
     "cli",
     "pull-request"
   ],
-  "author": "",
+  "author": "chaspy",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chaspy/get-sonar-feedback.git"
+  },
+  "homepage": "https://github.com/chaspy/get-sonar-feedback#readme",
+  "bugs": {
+    "url": "https://github.com/chaspy/get-sonar-feedback/issues"
+  },
   "dependencies": {
     "commander": "^11.1.0",
     "node-fetch": "^2.7.0",
