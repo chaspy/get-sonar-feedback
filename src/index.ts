@@ -18,6 +18,14 @@ interface GitHubConfig {
   token?: string;
 }
 
+interface GitHubPullRequest {
+  number: number;
+  title: string;
+  head: {
+    ref: string;
+  };
+}
+
 interface QualityGateResponse {
   projectStatus: {
     status: string;
@@ -76,6 +84,7 @@ interface MeasuresResponse {
 }
 
 class SonarCloudFeedback {
+  private static readonly MAX_DETAILED_ISSUES = 20;
   private sonarConfig: SonarConfig;
   private githubConfig: GitHubConfig;
 
@@ -132,19 +141,27 @@ class SonarCloudFeedback {
   }
 
   private getGitHubToken(): string | undefined {
+    const isProduction = process.env.NODE_ENV === 'production';
+    
     if (process.env.GITHUB_TOKEN) {
-      console.log(chalk.gray('Using GITHUB_TOKEN from environment variable'));
+      if (!isProduction) {
+        console.log(chalk.gray('Using GITHUB_TOKEN from environment variable'));
+      }
       return process.env.GITHUB_TOKEN;
     }
 
     try {
       const token = execSync('gh auth token', { encoding: 'utf-8' }).trim();
       if (token) {
-        console.log(chalk.gray('Using token from gh auth'));
+        if (!isProduction) {
+          console.log(chalk.gray('Using token from gh auth'));
+        }
         return token;
       }
     } catch (error) {
-      console.log(chalk.yellow('Could not get token from gh auth'));
+      if (!isProduction) {
+        console.log(chalk.yellow('Could not get token from gh auth'));
+      }
     }
 
     return undefined;
@@ -175,10 +192,14 @@ class SonarCloudFeedback {
       });
 
       if (!response.ok) {
-        throw new Error(`GitHub API returned ${response.status}: ${response.statusText}`);
+        const isProduction = process.env.NODE_ENV === 'production';
+        const errorMessage = isProduction 
+          ? 'GitHub API request failed' 
+          : `GitHub API returned ${response.status}: ${response.statusText}`;
+        throw new Error(errorMessage);
       }
 
-      const pulls = await response.json() as any[];
+      const pulls = await response.json() as GitHubPullRequest[];
       
       if (pulls.length === 0) {
         throw new Error(`No open pull request found for branch "${currentBranch}"`);
@@ -466,6 +487,18 @@ class SonarCloudFeedback {
     console.log(chalk.bold('\n🐛 All Issues'));
     console.log('-'.repeat(50));
 
+    const data = await this.fetchIssuesData(branch);
+    this.displayIssuesSummary(data);
+    
+    if (data.total > 0) {
+      this.displayIssuesBreakdown(data);
+      this.displayDetailedIssues(data);
+    } else {
+      console.log(chalk.green('✅ No issues found.'));
+    }
+  }
+
+  private async fetchIssuesData(branch: string): Promise<IssuesResponse> {
     const url = `https://sonarcloud.io/api/issues/search?componentKeys=${this.sonarConfig.projectKey}&branch=${branch}&organization=${this.sonarConfig.organization}&resolved=false&ps=500`;
     
     const response = await fetch(url, {
@@ -478,53 +511,55 @@ class SonarCloudFeedback {
       throw new Error(`Issues API returned ${response.status}`);
     }
 
-    const data = await response.json() as IssuesResponse;
-    
+    return await response.json() as IssuesResponse;
+  }
+
+  private displayIssuesSummary(data: IssuesResponse): void {
     console.log(`Total Issues: ${data.total}`);
     console.log(`Effort Total: ${data.effortTotal || 0} minutes`);
     console.log(`Debt Total: ${data.debtTotal || 0} minutes`);
+  }
 
-    if (data.total > 0) {
-      console.log(chalk.bold('\n📋 Issue Breakdown by Severity:'));
-      const severityCount = data.issues.reduce((acc, issue) => {
-        acc[issue.severity] = (acc[issue.severity] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-      
-      Object.entries(severityCount).forEach(([severity, count]) => {
-        console.log(`  ${this.getSeverityColored(severity)}: ${count}`);
+  private displayIssuesBreakdown(data: IssuesResponse): void {
+    console.log(chalk.bold('\n📋 Issue Breakdown by Severity:'));
+    const severityCount = data.issues.reduce((acc, issue) => {
+      acc[issue.severity] = (acc[issue.severity] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    Object.entries(severityCount).forEach(([severity, count]) => {
+      console.log(`  ${this.getSeverityColored(severity)}: ${count}`);
+    });
+
+    console.log(chalk.bold('\n📋 Issue Breakdown by Type:'));
+    const typeCount = data.issues.reduce((acc, issue) => {
+      const rule = issue.rule.split(':')[1] || issue.rule;
+      acc[rule] = (acc[rule] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    Object.entries(typeCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .forEach(([rule, count]) => {
+        console.log(`  ${rule}: ${count}`);
       });
+  }
 
-      console.log(chalk.bold('\n📋 Issue Breakdown by Type:'));
-      const typeCount = data.issues.reduce((acc, issue) => {
-        const rule = issue.rule.split(':')[1] || issue.rule;
-        acc[rule] = (acc[rule] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-      
-      Object.entries(typeCount)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10)
-        .forEach(([rule, count]) => {
-          console.log(`  ${rule}: ${count}`);
-        });
-
-      console.log(chalk.bold('\n📋 Detailed Issues (first 20):'));
-      data.issues.slice(0, 20).forEach((issue, index) => {
-        console.log(`\n${index + 1}. ${this.getSeverityColored(issue.severity)} - ${issue.message}`);
-        console.log(`   File: ${issue.component.replace(`${this.sonarConfig.projectKey}:`, '')}`);
-        console.log(`   Line: ${issue.line || 'N/A'}`);
-        console.log(`   Rule: ${issue.rule}`);
-        if (issue.effort) {
-          console.log(`   Effort: ${issue.effort}`);
-        }
-      });
-
-      if (data.total > 20) {
-        console.log(chalk.yellow(`\n... and ${data.total - 20} more issues`));
+  private displayDetailedIssues(data: IssuesResponse): void {
+    console.log(chalk.bold(`\n📋 Detailed Issues (first ${SonarCloudFeedback.MAX_DETAILED_ISSUES}):`));
+    data.issues.slice(0, SonarCloudFeedback.MAX_DETAILED_ISSUES).forEach((issue, index) => {
+      console.log(`\n${index + 1}. ${this.getSeverityColored(issue.severity)} - ${issue.message}`);
+      console.log(`   File: ${issue.component.replace(`${this.sonarConfig.projectKey}:`, '')}`);
+      console.log(`   Line: ${issue.line || 'N/A'}`);
+      console.log(`   Rule: ${issue.rule}`);
+      if (issue.effort) {
+        console.log(`   Effort: ${issue.effort}`);
       }
-    } else {
-      console.log(chalk.green('✅ No issues found.'));
+    });
+
+    if (data.total > SonarCloudFeedback.MAX_DETAILED_ISSUES) {
+      console.log(chalk.yellow(`\n... and ${data.total - SonarCloudFeedback.MAX_DETAILED_ISSUES} more issues`));
     }
   }
 
