@@ -1,15 +1,21 @@
 # get-sonar-feedback
 
-A CLI tool to fetch SonarCloud feedback for pull requests directly from your terminal.
+A CLI tool to fetch SonarCloud feedback for pull requests and project-wide analysis directly from your terminal.
 
 ## Features
 
+### 🔴 PR Analysis
 - 🎯 Quality Gate status checking
 - 🐛 Code issues detection
 - 🔒 Security hotspots analysis
 - 🔄 Code duplication metrics
 - 📊 Test coverage reporting
 - 🔍 Auto-detect PR number from current git branch
+
+### 📊 Project-wide Analysis  
+- 📊 **Project metrics**: Get comprehensive quality metrics for any branch
+- 🐛 **All issues**: Analyze all issues with severity breakdown and detailed reporting
+- 🎆 **Maintenance audits**: Regular quality checks beyond PR reviews
 
 ## Installation
 
@@ -28,12 +34,31 @@ npm run build
 
 ## Usage
 
+### PR Analysis
 ```bash
-# With explicit PR number
-get-sonar-feedback 123
+# Analyze specific pull request
+get-sonar-feedback pr 123
 
 # Auto-detect PR from current branch
-get-sonar-feedback
+get-sonar-feedback pr
+```
+
+### Project Metrics
+```bash
+# Get metrics for main branch
+get-sonar-feedback metrics
+
+# Get metrics for specific branch
+get-sonar-feedback metrics -b develop
+```
+
+### Issues Analysis
+```bash
+# Get all issues for main branch
+get-sonar-feedback issues
+
+# Get all issues for specific branch
+get-sonar-feedback issues -b feature-branch
 ```
 
 ## Configuration
@@ -41,6 +66,8 @@ get-sonar-feedback
 ### Required Environment Variables
 
 - `SONAR_TOKEN`: Your SonarCloud authentication token
+- `SONAR_PROJECT_KEY`: Your SonarCloud project key (e.g., `my-org_my-project`)
+- `SONAR_ORGANIZATION`: Your SonarCloud organization key
 
 ### Optional Environment Variables
 
@@ -54,6 +81,7 @@ gh auth login
 
 ## Example Output
 
+### PR Analysis Output
 ```
 ==========================================
 SonarCloud Analysis for PR #123
@@ -97,6 +125,32 @@ Uncovered Lines: 29
 
 ==========================================
 Analysis Complete
+==========================================
+```
+
+### Project Metrics Output
+```
+==========================================
+Project Metrics for branch: main
+==========================================
+
+📊 Project Metrics
+--------------------------------------------------
+🐛 Bugs: 0
+🔓 Vulnerabilities: 1
+💨 Code Smells: 21
+📊 Coverage: 85.2%
+🔄 Duplicated Lines Density: 2.5%
+🎯 Cyclomatic Complexity: 3642
+🧠 Cognitive Complexity: 2102
+⚡ Reliability Rating: A
+🔒 Security Rating: E
+🏗️  Maintainability Rating: A
+📄 Lines of Code: 33025
+⏱️  Technical Debt: 9h 12min
+
+==========================================
+Metrics Complete
 ==========================================
 ```
 

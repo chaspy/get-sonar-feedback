@@ -18,6 +18,14 @@ interface GitHubConfig {
   token?: string;
 }
 
+interface GitHubPullRequest {
+  number: number;
+  title: string;
+  head: {
+    ref: string;
+  };
+}
+
 interface QualityGateResponse {
   projectStatus: {
     status: string;
@@ -76,6 +84,7 @@ interface MeasuresResponse {
 }
 
 class SonarCloudFeedback {
+  private static readonly MAX_DETAILED_ISSUES = 20;
   private sonarConfig: SonarConfig;
   private githubConfig: GitHubConfig;
 
@@ -103,9 +112,9 @@ class SonarCloudFeedback {
     }
 
     this.sonarConfig = {
-      projectKey,
-      organization,
-      token
+      projectKey: projectKey!,
+      organization: organization!,
+      token: token!
     };
 
     this.githubConfig = this.getGitHubConfig();
@@ -132,19 +141,27 @@ class SonarCloudFeedback {
   }
 
   private getGitHubToken(): string | undefined {
+    const isProduction = process.env.NODE_ENV === 'production';
+    
     if (process.env.GITHUB_TOKEN) {
-      console.log(chalk.gray('Using GITHUB_TOKEN from environment variable'));
+      if (!isProduction) {
+        console.log(chalk.gray('Using GITHUB_TOKEN from environment variable'));
+      }
       return process.env.GITHUB_TOKEN;
     }
 
     try {
       const token = execSync('gh auth token', { encoding: 'utf-8' }).trim();
       if (token) {
-        console.log(chalk.gray('Using token from gh auth'));
+        if (!isProduction) {
+          console.log(chalk.gray('Using token from gh auth'));
+        }
         return token;
       }
     } catch (error) {
-      console.log(chalk.yellow('Could not get token from gh auth'));
+      if (!isProduction) {
+        console.log(chalk.yellow('Could not get token from gh auth'));
+      }
     }
 
     return undefined;
@@ -175,10 +192,14 @@ class SonarCloudFeedback {
       });
 
       if (!response.ok) {
-        throw new Error(`GitHub API returned ${response.status}: ${response.statusText}`);
+        const isProduction = process.env.NODE_ENV === 'production';
+        const errorMessage = isProduction 
+          ? 'GitHub API request failed' 
+          : `GitHub API returned ${response.status}: ${response.statusText}`;
+        throw new Error(errorMessage);
       }
 
-      const pulls = await response.json() as any[];
+      const pulls = await response.json() as GitHubPullRequest[];
       
       if (pulls.length === 0) {
         throw new Error(`No open pull request found for branch "${currentBranch}"`);
@@ -220,7 +241,8 @@ class SonarCloudFeedback {
       data.projectStatus.conditions
         .filter(c => c.status === 'ERROR')
         .forEach(condition => {
-          console.log(`  • ${condition.metricKey}: ${condition.actualValue} (threshold: ${condition.comparator} ${condition.errorThreshold})`);
+          const thresholdInfo = `${condition.comparator} ${condition.errorThreshold}`;
+          console.log(`  • ${condition.metricKey}: ${condition.actualValue} (threshold: ${thresholdInfo})`);
         });
     }
   }
@@ -253,12 +275,14 @@ class SonarCloudFeedback {
         console.log(`Issue Key: ${issue.key}`);
         console.log(`Rule: ${issue.rule}`);
         console.log(`Severity: ${this.getSeverityColored(issue.severity)}`);
-        console.log(`File: ${issue.component.replace(`${this.sonarConfig.projectKey}:`, '')}`);
+        const fileName = issue.component.replace(`${this.sonarConfig.projectKey}:`, '');
+        const tagsList = issue.tags.join(', ') || '';
+        console.log(`File: ${fileName}`);
         console.log(`Line: ${issue.line || 'N/A'}`);
         console.log(`Message: ${issue.message}`);
         console.log(`Effort: ${issue.effort || '0min'}`);
         console.log(`Debt: ${issue.debt || '0min'}`);
-        console.log(`Tags: ${issue.tags.join(', ') || ''}`);
+        console.log(`Tags: ${tagsList}`);
         console.log('-'.repeat(50));
       });
     } else {
@@ -294,7 +318,8 @@ class SonarCloudFeedback {
         console.log(`Security Category: ${hotspot.securityCategory}`);
         console.log(`Vulnerability Probability: ${this.getVulnerabilityColored(hotspot.vulnerabilityProbability)}`);
         console.log(`Status: ${hotspot.status}`);
-        console.log(`File: ${hotspot.component.replace(`${this.sonarConfig.projectKey}:`, '')}`);
+        const fileName = hotspot.component.replace(`${this.sonarConfig.projectKey}:`, '');
+        console.log(`File: ${fileName}`);
         console.log(`Line: ${hotspot.line || 'N/A'}`);
         console.log(`Message: ${hotspot.message}`);
         console.log('-'.repeat(50));
@@ -382,6 +407,194 @@ class SonarCloudFeedback {
     }
   }
 
+  private async fetchProjectMetrics(branch: string): Promise<void> {
+    console.log(chalk.bold('\n📊 Project Metrics'));
+    console.log('-'.repeat(50));
+
+    const metrics = [
+      'bugs',
+      'vulnerabilities', 
+      'code_smells',
+      'coverage',
+      'line_coverage',
+      'duplicated_lines_density',
+      'complexity',
+      'cognitive_complexity',
+      'reliability_rating',
+      'security_rating',
+      'sqale_rating',
+      'ncloc',
+      'sqale_index'
+    ].join(',');
+
+    const url = `https://sonarcloud.io/api/measures/component?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&branch=${branch}`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${this.sonarConfig.token}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Project Metrics API returned ${response.status}`);
+    }
+
+    const data = await response.json() as MeasuresResponse;
+    
+    data.component.measures.forEach(measure => {
+      const value = measure.periods?.[0]?.value || (measure as any).value || '0';
+      switch (measure.metric) {
+        case 'bugs':
+          console.log(`🐛 Bugs: ${value}`);
+          break;
+        case 'vulnerabilities':
+          console.log(`🔓 Vulnerabilities: ${value}`);
+          break;
+        case 'code_smells':
+          console.log(`💨 Code Smells: ${value}`);
+          break;
+        case 'coverage':
+          console.log(`📊 Coverage: ${value}%`);
+          break;
+        case 'line_coverage':
+          console.log(`📈 Line Coverage: ${value}%`);
+          break;
+        case 'duplicated_lines_density':
+          console.log(`🔄 Duplicated Lines Density: ${value}%`);
+          break;
+        case 'complexity':
+          console.log(`🎯 Cyclomatic Complexity: ${value}`);
+          break;
+        case 'cognitive_complexity':
+          console.log(`🧠 Cognitive Complexity: ${value}`);
+          break;
+        case 'reliability_rating':
+          console.log(`⚡ Reliability Rating: ${this.getRatingColored(value)}`);
+          break;
+        case 'security_rating':
+          console.log(`🔒 Security Rating: ${this.getRatingColored(value)}`);
+          break;
+        case 'sqale_rating':
+          console.log(`🏗️  Maintainability Rating: ${this.getRatingColored(value)}`);
+          break;
+        case 'ncloc':
+          console.log(`📄 Lines of Code: ${value}`);
+          break;
+        case 'sqale_index': {
+          const hours = Math.round(parseInt(value) / 60);
+          const minutes = parseInt(value) % 60;
+          console.log(`⏱️  Technical Debt: ${hours}h ${minutes}min`);
+          break;
+        }
+      }
+    });
+  }
+
+  private async fetchAllIssues(branch: string): Promise<void> {
+    console.log(chalk.bold('\n🐛 All Issues'));
+    console.log('-'.repeat(50));
+
+    const data = await this.fetchIssuesData(branch);
+    this.displayIssuesSummary(data);
+    
+    if (data.total > 0) {
+      this.displayIssuesBreakdown(data);
+      this.displayDetailedIssues(data);
+    } else {
+      console.log(chalk.green('✅ No issues found.'));
+    }
+  }
+
+  private async fetchIssuesData(branch: string): Promise<IssuesResponse> {
+    const url = `https://sonarcloud.io/api/issues/search?componentKeys=${this.sonarConfig.projectKey}&branch=${branch}&organization=${this.sonarConfig.organization}&resolved=false&ps=500`;
+    
+    const basicAuth = Buffer.from(`${this.sonarConfig.token}:`).toString('base64');
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Basic ${basicAuth}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Issues API returned ${response.status}`);
+    }
+
+    return await response.json() as IssuesResponse;
+  }
+
+  private displayIssuesSummary(data: IssuesResponse): void {
+    console.log(`Total Issues: ${data.total}`);
+    console.log(`Effort Total: ${data.effortTotal || 0} minutes`);
+    console.log(`Debt Total: ${data.debtTotal || 0} minutes`);
+  }
+
+  private displayIssuesBreakdown(data: IssuesResponse): void {
+    console.log(chalk.bold('\n📋 Issue Breakdown by Severity:'));
+    const severityCount = data.issues.reduce((acc, issue) => {
+      acc[issue.severity] = (acc[issue.severity] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    Object.entries(severityCount).forEach(([severity, count]) => {
+      console.log(`  ${this.getSeverityColored(severity)}: ${count}`);
+    });
+
+    console.log(chalk.bold('\n📋 Issue Breakdown by Type:'));
+    const typeCount = data.issues.reduce((acc, issue) => {
+      const rule = issue.rule.split(':')[1] || issue.rule;
+      acc[rule] = (acc[rule] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    Object.entries(typeCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .forEach(([rule, count]) => {
+        console.log(`  ${rule}: ${count}`);
+      });
+  }
+
+  private displayDetailedIssues(data: IssuesResponse): void {
+    console.log(chalk.bold(`\n📋 Detailed Issues (first ${SonarCloudFeedback.MAX_DETAILED_ISSUES}):`));
+    data.issues.slice(0, SonarCloudFeedback.MAX_DETAILED_ISSUES).forEach((issue, index) => {
+      const severityColored = this.getSeverityColored(issue.severity);
+      const fileName = issue.component.replace(`${this.sonarConfig.projectKey}:`, '');
+      console.log(`\n${index + 1}. ${severityColored} - ${issue.message}`);
+      console.log(`   File: ${fileName}`);
+      console.log(`   Line: ${issue.line || 'N/A'}`);
+      console.log(`   Rule: ${issue.rule}`);
+      if (issue.effort) {
+        console.log(`   Effort: ${issue.effort}`);
+      }
+    });
+
+    if (data.total > SonarCloudFeedback.MAX_DETAILED_ISSUES) {
+      console.log(chalk.yellow(`\n... and ${data.total - SonarCloudFeedback.MAX_DETAILED_ISSUES} more issues`));
+    }
+  }
+
+  private getRatingColored(rating: string): string {
+    switch (rating) {
+      case '1.0':
+      case '1':
+        return chalk.green('A');
+      case '2.0':
+      case '2':
+        return chalk.yellow('B');
+      case '3.0':
+      case '3':
+        return chalk.yellow('C');
+      case '4.0':
+      case '4':
+        return chalk.red('D');
+      case '5.0':
+      case '5':
+        return chalk.red('E');
+      default:
+        return rating;
+    }
+  }
+
   private getSeverityColored(severity: string): string {
     switch (severity.toUpperCase()) {
       case 'BLOCKER':
@@ -412,7 +625,7 @@ class SonarCloudFeedback {
     }
   }
 
-  public async run(prId?: string): Promise<void> {
+  public async runPrAnalysis(prId?: string): Promise<void> {
     try {
       const pullRequestId = await this.getPullRequestId(prId);
 
@@ -434,18 +647,82 @@ class SonarCloudFeedback {
       process.exit(1);
     }
   }
+
+  public async runProjectMetrics(branch: string = 'main'): Promise<void> {
+    try {
+      if (!this.sonarConfig.token) {
+        throw new Error('SONAR_TOKEN environment variable is not set');
+      }
+
+      console.log(chalk.bold('\n=========================================='));
+      console.log(chalk.bold(`Project Metrics for branch: ${branch}`));
+      console.log(chalk.bold('=========================================='));
+
+      await this.fetchProjectMetrics(branch);
+
+      console.log(chalk.bold('\n=========================================='));
+      console.log(chalk.bold('Metrics Complete'));
+      console.log(chalk.bold('=========================================='));
+    } catch (error) {
+      console.error(chalk.red('\nError:'), error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  }
+
+  public async runAllIssues(branch: string = 'main'): Promise<void> {
+    try {
+      if (!this.sonarConfig.token) {
+        throw new Error('SONAR_TOKEN environment variable is not set');
+      }
+
+      console.log(chalk.bold('\n=========================================='));
+      console.log(chalk.bold(`All Issues for branch: ${branch}`));
+      console.log(chalk.bold('=========================================='));
+
+      await this.fetchAllIssues(branch);
+
+      console.log(chalk.bold('\n=========================================='));
+      console.log(chalk.bold('Issues Complete'));
+      console.log(chalk.bold('=========================================='));
+    } catch (error) {
+      console.error(chalk.red('\nError:'), error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  }
 }
 
 const program = new Command();
 
 program
   .name('get-sonar-feedback')
-  .description('Fetch SonarCloud feedback for pull requests')
-  .version('1.0.0')
+  .description('Fetch SonarCloud feedback')
+  .version('0.2.0');
+
+program
+  .command('pr')
+  .description('Analyze pull request')
   .argument('[pr-number]', 'Pull request number (optional, will auto-detect if not provided)')
   .action(async (prNumber?: string) => {
     const feedback = new SonarCloudFeedback();
-    await feedback.run(prNumber);
+    await feedback.runPrAnalysis(prNumber);
+  });
+
+program
+  .command('metrics')
+  .description('Get project metrics')
+  .option('-b, --branch <branch>', 'Branch name', 'main')
+  .action(async (options) => {
+    const feedback = new SonarCloudFeedback();
+    await feedback.runProjectMetrics(options.branch);
+  });
+
+program
+  .command('issues')
+  .description('Get all issues for a branch')
+  .option('-b, --branch <branch>', 'Branch name', 'main')
+  .action(async (options) => {
+    const feedback = new SonarCloudFeedback();
+    await feedback.runAllIssues(options.branch);
   });
 
 program.parse();
