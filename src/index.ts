@@ -696,7 +696,7 @@ const program = new Command();
 program
   .name('get-sonar-feedback')
   .description('Fetch SonarCloud feedback')
-  .version('0.2.0');
+  .version('0.2.1');
 
 program
   .command('pr')

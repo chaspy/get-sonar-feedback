@@ -47,3 +47,4 @@ coverage/
 # Environment files
 .env
 .env.*
+.envrc
