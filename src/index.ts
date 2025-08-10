@@ -480,11 +480,12 @@ class SonarCloudFeedback {
         case 'ncloc':
           console.log(`📄 Lines of Code: ${value}`);
           break;
-        case 'sqale_index':
+        case 'sqale_index': {
           const hours = Math.round(parseInt(value) / 60);
           const minutes = parseInt(value) % 60;
           console.log(`⏱️  Technical Debt: ${hours}h ${minutes}min`);
           break;
+        }
       }
     });
   }
@@ -507,9 +508,10 @@ class SonarCloudFeedback {
   private async fetchIssuesData(branch: string): Promise<IssuesResponse> {
     const url = `https://sonarcloud.io/api/issues/search?componentKeys=${this.sonarConfig.projectKey}&branch=${branch}&organization=${this.sonarConfig.organization}&resolved=false&ps=500`;
     
+    const basicAuth = Buffer.from(`${this.sonarConfig.token}:`).toString('base64');
     const response = await fetch(url, {
       headers: {
-        'Authorization': `Basic ${Buffer.from(`${this.sonarConfig.token}:`).toString('base64')}`
+        'Authorization': `Basic ${basicAuth}`
       }
     });
 
