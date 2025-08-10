@@ -112,9 +112,9 @@ class SonarCloudFeedback {
     }
 
     this.sonarConfig = {
-      projectKey,
-      organization,
-      token
+      projectKey: projectKey!,
+      organization: organization!,
+      token: token!
     };
 
     this.githubConfig = this.getGitHubConfig();
@@ -241,7 +241,8 @@ class SonarCloudFeedback {
       data.projectStatus.conditions
         .filter(c => c.status === 'ERROR')
         .forEach(condition => {
-          console.log(`  • ${condition.metricKey}: ${condition.actualValue} (threshold: ${condition.comparator} ${condition.errorThreshold})`);
+          const thresholdInfo = `${condition.comparator} ${condition.errorThreshold}`;
+          console.log(`  • ${condition.metricKey}: ${condition.actualValue} (threshold: ${thresholdInfo})`);
         });
     }
   }
@@ -274,12 +275,14 @@ class SonarCloudFeedback {
         console.log(`Issue Key: ${issue.key}`);
         console.log(`Rule: ${issue.rule}`);
         console.log(`Severity: ${this.getSeverityColored(issue.severity)}`);
-        console.log(`File: ${issue.component.replace(`${this.sonarConfig.projectKey}:`, '')}`);
+        const fileName = issue.component.replace(`${this.sonarConfig.projectKey}:`, '');
+        const tagsList = issue.tags.join(', ') || '';
+        console.log(`File: ${fileName}`);
         console.log(`Line: ${issue.line || 'N/A'}`);
         console.log(`Message: ${issue.message}`);
         console.log(`Effort: ${issue.effort || '0min'}`);
         console.log(`Debt: ${issue.debt || '0min'}`);
-        console.log(`Tags: ${issue.tags.join(', ') || ''}`);
+        console.log(`Tags: ${tagsList}`);
         console.log('-'.repeat(50));
       });
     } else {
@@ -315,7 +318,8 @@ class SonarCloudFeedback {
         console.log(`Security Category: ${hotspot.securityCategory}`);
         console.log(`Vulnerability Probability: ${this.getVulnerabilityColored(hotspot.vulnerabilityProbability)}`);
         console.log(`Status: ${hotspot.status}`);
-        console.log(`File: ${hotspot.component.replace(`${this.sonarConfig.projectKey}:`, '')}`);
+        const fileName = hotspot.component.replace(`${this.sonarConfig.projectKey}:`, '');
+        console.log(`File: ${fileName}`);
         console.log(`Line: ${hotspot.line || 'N/A'}`);
         console.log(`Message: ${hotspot.message}`);
         console.log('-'.repeat(50));
@@ -477,7 +481,9 @@ class SonarCloudFeedback {
           console.log(`📄 Lines of Code: ${value}`);
           break;
         case 'sqale_index':
-          console.log(`⏱️  Technical Debt: ${Math.round(parseInt(value) / 60)}h ${parseInt(value) % 60}min`);
+          const hours = Math.round(parseInt(value) / 60);
+          const minutes = parseInt(value) % 60;
+          console.log(`⏱️  Technical Debt: ${hours}h ${minutes}min`);
           break;
       }
     });
@@ -549,8 +555,10 @@ class SonarCloudFeedback {
   private displayDetailedIssues(data: IssuesResponse): void {
     console.log(chalk.bold(`\n📋 Detailed Issues (first ${SonarCloudFeedback.MAX_DETAILED_ISSUES}):`));
     data.issues.slice(0, SonarCloudFeedback.MAX_DETAILED_ISSUES).forEach((issue, index) => {
-      console.log(`\n${index + 1}. ${this.getSeverityColored(issue.severity)} - ${issue.message}`);
-      console.log(`   File: ${issue.component.replace(`${this.sonarConfig.projectKey}:`, '')}`);
+      const severityColored = this.getSeverityColored(issue.severity);
+      const fileName = issue.component.replace(`${this.sonarConfig.projectKey}:`, '');
+      console.log(`\n${index + 1}. ${severityColored} - ${issue.message}`);
+      console.log(`   File: ${fileName}`);
       console.log(`   Line: ${issue.line || 'N/A'}`);
       console.log(`   Rule: ${issue.rule}`);
       if (issue.effort) {
