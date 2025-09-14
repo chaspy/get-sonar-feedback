@@ -131,7 +131,7 @@ class SonarCloudFeedback {
         encoding: "utf-8",
       }).trim();
       const match = remoteUrl.match(
-        /github\.com[\/:]([^/]+)\/(.+?)(?:\.git)?$/
+        /github\.com[/:]([^/]+)\/(.+?)(?:\.git)?$/
       );
 
       if (!match) {
