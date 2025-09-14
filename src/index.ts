@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
-import fetch from "node-fetch";
+import fetch, { Response } from "node-fetch";
 import chalk from "chalk";
 import { execFileSync } from "child_process";
 
@@ -86,6 +86,57 @@ class SonarCloudFeedback {
   private static readonly MAX_DETAILED_ISSUES = 20;
   private readonly sonarConfig: SonarConfig;
   private readonly githubConfig: GitHubConfig;
+
+  private isDebugMode(): boolean {
+    return process.env.DEBUG === 'true' || process.env.NODE_ENV === 'debug';
+  }
+
+  private maskSensitiveInfo(value: string): string {
+    if (value.length <= 6) {
+      return value.substring(0, 1) + '***';
+    }
+    return value.substring(0, value.length - 3) + '***';
+  }
+
+  private debugLog(message: string): void {
+    if (this.isDebugMode()) {
+      console.log(chalk.gray(message));
+    }
+  }
+
+  private maskUrlSensitiveInfo(url: string): string {
+    // Mask project key and organization in URLs while keeping the structure visible
+    let maskedUrl = url;
+    if (this.sonarConfig.projectKey) {
+      maskedUrl = maskedUrl.replace(
+        this.sonarConfig.projectKey,
+        this.maskSensitiveInfo(this.sonarConfig.projectKey)
+      );
+    }
+    if (this.sonarConfig.organization) {
+      maskedUrl = maskedUrl.replace(
+        this.sonarConfig.organization,
+        this.maskSensitiveInfo(this.sonarConfig.organization)
+      );
+    }
+    return maskedUrl;
+  }
+
+  private logApiUrl(apiName: string, url: string): void {
+    this.debugLog(`\n[DEBUG] ${apiName} API URL: ${this.maskUrlSensitiveInfo(url)}`);
+  }
+
+  private async logErrorResponse(response: Response): Promise<void> {
+    if (this.isDebugMode()) {
+      this.debugLog(`\n[DEBUG] Response Status: ${response.status} ${response.statusText}`);
+      try {
+        const errorBody = await response.text();
+        this.debugLog(`[DEBUG] Response Body: ${errorBody}`);
+      } catch (error) {
+        this.debugLog(`[DEBUG] Could not read response body: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
 
   constructor() {
     // Validate required environment variables
@@ -257,7 +308,15 @@ class SonarCloudFeedback {
     console.log(chalk.bold("\n🎯 Quality Gate Status"));
     console.log("-".repeat(50));
 
+    if (this.isDebugMode()) {
+      this.debugLog('\n[DEBUG] SonarCloud Configuration:');
+      this.debugLog(`  Project Key: ${this.maskSensitiveInfo(this.sonarConfig.projectKey)}`);
+      this.debugLog(`  Organization: ${this.maskSensitiveInfo(this.sonarConfig.organization)}`);
+      this.debugLog(`  Pull Request: ${prId}`);
+    }
+
     const url = `https://sonarcloud.io/api/qualitygates/project_status?projectKey=${this.sonarConfig.projectKey}&pullRequest=${prId}`;
+    this.logApiUrl('Quality Gate', url);
 
     const response = await fetch(url, {
       headers: {
@@ -266,6 +325,7 @@ class SonarCloudFeedback {
     });
 
     if (!response.ok) {
+      await this.logErrorResponse(response);
       throw new Error(`Quality Gate API returned ${response.status}`);
     }
 
@@ -296,6 +356,7 @@ class SonarCloudFeedback {
     console.log("-".repeat(50));
 
     const url = `https://sonarcloud.io/api/issues/search?componentKeys=${this.sonarConfig.projectKey}&pullRequest=${prId}&organization=${this.sonarConfig.organization}&resolved=false&ps=500`;
+    this.logApiUrl('Issues', url);
 
     const response = await fetch(url, {
       headers: {
@@ -306,6 +367,7 @@ class SonarCloudFeedback {
     });
 
     if (!response.ok) {
+      await this.logErrorResponse(response);
       throw new Error(`Issues API returned ${response.status}`);
     }
 
@@ -344,6 +406,7 @@ class SonarCloudFeedback {
     console.log("-".repeat(50));
 
     const url = `https://sonarcloud.io/api/hotspots/search?projectKey=${this.sonarConfig.projectKey}&pullRequest=${prId}`;
+    this.logApiUrl('Hotspots', url);
 
     const response = await fetch(url, {
       headers: {
@@ -352,6 +415,7 @@ class SonarCloudFeedback {
     });
 
     if (!response.ok) {
+      await this.logErrorResponse(response);
       throw new Error(`Hotspots API returned ${response.status}`);
     }
 
@@ -392,6 +456,7 @@ class SonarCloudFeedback {
     const metrics =
       "new_duplicated_lines_density,new_duplicated_lines,new_duplicated_blocks";
     const url = `https://sonarcloud.io/api/measures/component?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&pullRequest=${prId}`;
+    this.logApiUrl('Duplication Metrics', url);
 
     const response = await fetch(url, {
       headers: {
@@ -400,6 +465,7 @@ class SonarCloudFeedback {
     });
 
     if (!response.ok) {
+      await this.logErrorResponse(response);
       throw new Error(`Measures API returned ${response.status}`);
     }
 
@@ -427,6 +493,7 @@ class SonarCloudFeedback {
 
     const metrics = "new_coverage,new_lines_to_cover,new_uncovered_lines";
     const url = `https://sonarcloud.io/api/measures/component?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&pullRequest=${prId}`;
+    this.logApiUrl('Coverage Metrics', url);
 
     const response = await fetch(url, {
       headers: {
@@ -435,6 +502,7 @@ class SonarCloudFeedback {
     });
 
     if (!response.ok) {
+      await this.logErrorResponse(response);
       throw new Error(`Coverage API returned ${response.status}`);
     }
 
@@ -716,6 +784,11 @@ class SonarCloudFeedback {
 
   public async runPrAnalysis(prId?: string): Promise<void> {
     try {
+      if (this.isDebugMode()) {
+        this.debugLog('\n[DEBUG] Starting PR Analysis');
+        this.debugLog('  Set DEBUG=true or NODE_ENV=debug for debug output');
+      }
+
       const pullRequestId = await this.getPullRequestId(prId);
 
       console.log(chalk.bold("\n=========================================="));
@@ -797,7 +870,7 @@ const program = new Command();
 program
   .name("get-sonar-feedback")
   .description("Fetch SonarCloud feedback")
-  .version("0.2.0");
+  .version("0.2.3");
 
 program
   .command("pr")
