@@ -160,7 +160,9 @@ class SonarCloudFeedback {
     }
 
     try {
-      const token = execFileSync("gh", ["auth", "token"], { encoding: "utf-8" }).trim();
+      const token = execFileSync("gh", ["auth", "token"], {
+        encoding: "utf-8",
+      }).trim();
       if (token) {
         if (!isProduction) {
           console.log(chalk.gray("Using token from gh auth"));
