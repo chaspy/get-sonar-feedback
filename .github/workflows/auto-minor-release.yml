@@ -21,7 +21,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
 
       - name: Configure git user
         run: |
@@ -77,7 +76,16 @@ jobs:
       - name: Build TypeScript
         run: npm run build
 
-      - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --provenance --access public
+      - name: Publish to npm (if version changed)
+        id: npm-publish
+        uses: JS-DevTools/npm-publish@v3
+        with:
+          token: ${{ secrets.NPM_TOKEN }}
+          provenance: true
+          access: public
+
+      - name: Log publish result
+        if: steps.npm-publish.outputs.type
+        run: |
+          echo "Published new version: ${{ steps.npm-publish.outputs.version }}"
+          echo "Package type: ${{ steps.npm-publish.outputs.type }}"
