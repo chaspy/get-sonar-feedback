@@ -3,8 +3,7 @@
 import { Command } from "commander";
 import fetch from "node-fetch";
 import chalk from "chalk";
-import { execSync } from "child_process";
-import * as path from "path";
+import { execFileSync } from "child_process";
 
 interface SonarConfig {
   projectKey: string;
@@ -85,8 +84,8 @@ interface MeasuresResponse {
 
 class SonarCloudFeedback {
   private static readonly MAX_DETAILED_ISSUES = 20;
-  private sonarConfig: SonarConfig;
-  private githubConfig: GitHubConfig;
+  private readonly sonarConfig: SonarConfig;
+  private readonly githubConfig: GitHubConfig;
 
   constructor() {
     // Validate required environment variables
@@ -128,10 +127,10 @@ class SonarCloudFeedback {
 
   private getGitHubConfig(): GitHubConfig {
     try {
-      const remoteUrl = execSync("git remote get-url origin", {
+      const remoteUrl = execFileSync("git", ["remote", "get-url", "origin"], {
         encoding: "utf-8",
       }).trim();
-      const match = remoteUrl.match(/github\.com[:\/]([^\/]+)\/(.+?)(\.git)?$/);
+      const match = remoteUrl.match(/github\.com[:\/]([^/]+)\/(.+?)(\.git)?$/);
 
       if (!match) {
         throw new Error(
@@ -161,7 +160,7 @@ class SonarCloudFeedback {
     }
 
     try {
-      const token = execSync("gh auth token", { encoding: "utf-8" }).trim();
+      const token = execFileSync("gh", ["auth", "token"], { encoding: "utf-8" }).trim();
       if (token) {
         if (!isProduction) {
           console.log(chalk.gray("Using token from gh auth"));
@@ -169,9 +168,12 @@ class SonarCloudFeedback {
         return token;
       }
     } catch (error) {
-      if (!isProduction) {
-        console.log(chalk.yellow("Could not get token from gh auth"));
-      }
+      console.warn(
+        chalk.yellow(
+          "Could not get token from gh auth; proceeding without GitHub token"
+        ),
+        error instanceof Error ? error.message : String(error)
+      );
     }
 
     return undefined;
@@ -189,9 +191,11 @@ class SonarCloudFeedback {
     );
 
     try {
-      const currentBranch = execSync("git rev-parse --abbrev-ref HEAD", {
-        encoding: "utf-8",
-      }).trim();
+      const currentBranch = execFileSync(
+        "git",
+        ["rev-parse", "--abbrev-ref", "HEAD"],
+        { encoding: "utf-8" }
+      ).trim();
       console.log(chalk.gray(`Current branch: ${currentBranch}`));
 
       if (!this.githubConfig.token) {
