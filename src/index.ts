@@ -130,9 +130,8 @@ class SonarCloudFeedback {
       const remoteUrl = execFileSync("git", ["remote", "get-url", "origin"], {
         encoding: "utf-8",
       }).trim();
-      const match = remoteUrl.match(
-        /github\.com[/:]([^/]+)\/(.+?)(?:\.git)?$/
-      );
+      const pattern = new RegExp("github\\.com[/:]([^/]+)/(.+?)(?:\\.git)?$");
+      const match = remoteUrl.match(pattern);
 
       if (!match) {
         throw new Error(
