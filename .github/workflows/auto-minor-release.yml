@@ -70,3 +70,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: steps.tag.outputs.exists == 'false'
+
+      - name: Install deps (for publish)
+        run: npm ci --no-audit --no-fund --ignore-scripts
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
