@@ -81,12 +81,34 @@ get-sonar-feedback issues --all
 ### Optional Environment Variables
 
 - `GITHUB_TOKEN`: GitHub personal access token (required for PR auto-detection if not using GitHub CLI)
+- `DEBUG`: Set to `true` to enable debug output (see Debug Mode section below)
+- `NODE_ENV`: Set to `debug` to enable debug output
 
 Alternatively, you can authenticate with GitHub CLI:
 
 ```bash
 gh auth login
 ```
+
+### Debug Mode
+
+When encountering issues like 404 errors from SonarCloud API, you can enable debug mode to see detailed information about API calls and responses:
+
+```bash
+# Using DEBUG environment variable
+DEBUG=true get-sonar-feedback pr
+
+# Or using NODE_ENV
+NODE_ENV=debug get-sonar-feedback pr
+```
+
+Debug mode will display:
+- SonarCloud configuration (Project Key, Organization)
+- Complete API URLs being called
+- Response status codes and error messages
+- Response body content for failed requests
+
+This is particularly useful for troubleshooting authentication issues or misconfigured project keys.
 
 ## Release & Publish
 

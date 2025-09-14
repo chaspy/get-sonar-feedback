@@ -257,7 +257,20 @@ class SonarCloudFeedback {
     console.log(chalk.bold("\n🎯 Quality Gate Status"));
     console.log("-".repeat(50));
 
+    const isDebug = process.env.DEBUG === 'true' || process.env.NODE_ENV === 'debug';
+
+    if (isDebug) {
+      console.log(chalk.gray('\n[DEBUG] SonarCloud Configuration:'));
+      console.log(chalk.gray(`  Project Key: ${this.sonarConfig.projectKey}`));
+      console.log(chalk.gray(`  Organization: ${this.sonarConfig.organization}`));
+      console.log(chalk.gray(`  Pull Request: ${prId}`));
+    }
+
     const url = `https://sonarcloud.io/api/qualitygates/project_status?projectKey=${this.sonarConfig.projectKey}&pullRequest=${prId}`;
+
+    if (isDebug) {
+      console.log(chalk.gray(`\n[DEBUG] Quality Gate API URL: ${url}`));
+    }
 
     const response = await fetch(url, {
       headers: {
@@ -266,6 +279,15 @@ class SonarCloudFeedback {
     });
 
     if (!response.ok) {
+      if (isDebug) {
+        console.log(chalk.gray(`\n[DEBUG] Response Status: ${response.status} ${response.statusText}`));
+        try {
+          const errorBody = await response.text();
+          console.log(chalk.gray(`[DEBUG] Response Body: ${errorBody}`));
+        } catch (e) {
+          console.log(chalk.gray('[DEBUG] Could not read response body'));
+        }
+      }
       throw new Error(`Quality Gate API returned ${response.status}`);
     }
 
@@ -295,7 +317,13 @@ class SonarCloudFeedback {
     console.log(chalk.bold("\n🐛 Issues"));
     console.log("-".repeat(50));
 
+    const isDebug = process.env.DEBUG === 'true' || process.env.NODE_ENV === 'debug';
+
     const url = `https://sonarcloud.io/api/issues/search?componentKeys=${this.sonarConfig.projectKey}&pullRequest=${prId}&organization=${this.sonarConfig.organization}&resolved=false&ps=500`;
+
+    if (isDebug) {
+      console.log(chalk.gray(`\n[DEBUG] Issues API URL: ${url}`));
+    }
 
     const response = await fetch(url, {
       headers: {
@@ -306,6 +334,15 @@ class SonarCloudFeedback {
     });
 
     if (!response.ok) {
+      if (isDebug) {
+        console.log(chalk.gray(`\n[DEBUG] Response Status: ${response.status} ${response.statusText}`));
+        try {
+          const errorBody = await response.text();
+          console.log(chalk.gray(`[DEBUG] Response Body: ${errorBody}`));
+        } catch (e) {
+          console.log(chalk.gray('[DEBUG] Could not read response body'));
+        }
+      }
       throw new Error(`Issues API returned ${response.status}`);
     }
 
@@ -343,7 +380,13 @@ class SonarCloudFeedback {
     console.log(chalk.bold("\n🔒 Security Hotspots"));
     console.log("-".repeat(50));
 
+    const isDebug = process.env.DEBUG === 'true' || process.env.NODE_ENV === 'debug';
+
     const url = `https://sonarcloud.io/api/hotspots/search?projectKey=${this.sonarConfig.projectKey}&pullRequest=${prId}`;
+
+    if (isDebug) {
+      console.log(chalk.gray(`\n[DEBUG] Hotspots API URL: ${url}`));
+    }
 
     const response = await fetch(url, {
       headers: {
@@ -352,6 +395,15 @@ class SonarCloudFeedback {
     });
 
     if (!response.ok) {
+      if (isDebug) {
+        console.log(chalk.gray(`\n[DEBUG] Response Status: ${response.status} ${response.statusText}`));
+        try {
+          const errorBody = await response.text();
+          console.log(chalk.gray(`[DEBUG] Response Body: ${errorBody}`));
+        } catch (e) {
+          console.log(chalk.gray('[DEBUG] Could not read response body'));
+        }
+      }
       throw new Error(`Hotspots API returned ${response.status}`);
     }
 
@@ -389,9 +441,15 @@ class SonarCloudFeedback {
     console.log(chalk.bold("\n🔄 Code Duplication"));
     console.log("-".repeat(50));
 
+    const isDebug = process.env.DEBUG === 'true' || process.env.NODE_ENV === 'debug';
+
     const metrics =
       "new_duplicated_lines_density,new_duplicated_lines,new_duplicated_blocks";
     const url = `https://sonarcloud.io/api/measures/component?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&pullRequest=${prId}`;
+
+    if (isDebug) {
+      console.log(chalk.gray(`\n[DEBUG] Duplication Metrics API URL: ${url}`));
+    }
 
     const response = await fetch(url, {
       headers: {
@@ -400,6 +458,15 @@ class SonarCloudFeedback {
     });
 
     if (!response.ok) {
+      if (isDebug) {
+        console.log(chalk.gray(`\n[DEBUG] Response Status: ${response.status} ${response.statusText}`));
+        try {
+          const errorBody = await response.text();
+          console.log(chalk.gray(`[DEBUG] Response Body: ${errorBody}`));
+        } catch (e) {
+          console.log(chalk.gray('[DEBUG] Could not read response body'));
+        }
+      }
       throw new Error(`Measures API returned ${response.status}`);
     }
 
@@ -425,8 +492,14 @@ class SonarCloudFeedback {
     console.log(chalk.bold("\n📊 Test Coverage"));
     console.log("-".repeat(50));
 
+    const isDebug = process.env.DEBUG === 'true' || process.env.NODE_ENV === 'debug';
+
     const metrics = "new_coverage,new_lines_to_cover,new_uncovered_lines";
     const url = `https://sonarcloud.io/api/measures/component?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&pullRequest=${prId}`;
+
+    if (isDebug) {
+      console.log(chalk.gray(`\n[DEBUG] Coverage Metrics API URL: ${url}`));
+    }
 
     const response = await fetch(url, {
       headers: {
@@ -435,6 +508,15 @@ class SonarCloudFeedback {
     });
 
     if (!response.ok) {
+      if (isDebug) {
+        console.log(chalk.gray(`\n[DEBUG] Response Status: ${response.status} ${response.statusText}`));
+        try {
+          const errorBody = await response.text();
+          console.log(chalk.gray(`[DEBUG] Response Body: ${errorBody}`));
+        } catch (e) {
+          console.log(chalk.gray('[DEBUG] Could not read response body'));
+        }
+      }
       throw new Error(`Coverage API returned ${response.status}`);
     }
 
@@ -716,6 +798,13 @@ class SonarCloudFeedback {
 
   public async runPrAnalysis(prId?: string): Promise<void> {
     try {
+      const isDebug = process.env.DEBUG === 'true' || process.env.NODE_ENV === 'debug';
+
+      if (isDebug) {
+        console.log(chalk.gray('\n[DEBUG] Starting PR Analysis'));
+        console.log(chalk.gray('  Set DEBUG=true or NODE_ENV=debug for debug output'));
+      }
+
       const pullRequestId = await this.getPullRequestId(prId);
 
       console.log(chalk.bold("\n=========================================="));
@@ -797,7 +886,7 @@ const program = new Command();
 program
   .name("get-sonar-feedback")
   .description("Fetch SonarCloud feedback")
-  .version("0.2.0");
+  .version("0.2.3");
 
 program
   .command("pr")
