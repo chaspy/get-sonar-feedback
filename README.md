@@ -59,6 +59,12 @@ get-sonar-feedback issues
 
 # Get all issues for specific branch
 get-sonar-feedback issues -b feature-branch
+
+# Show only the first N detailed issues
+get-sonar-feedback issues --limit 50
+
+# Show all detailed issues
+get-sonar-feedback issues --all
 ```
 
 ## Configuration
@@ -78,6 +84,17 @@ Alternatively, you can authenticate with GitHub CLI:
 ```bash
 gh auth login
 ```
+
+## Release & Publish
+
+- Merging a PR into `main` triggers an automated minor version bump, creates a Git tag and a GitHub Release, then publishes to npm.
+- Requirements:
+  - Add `NPM_TOKEN` in GitHub Actions Secrets with publish permission.
+  - The `package.json` `name` must be available on npm, and the next version must be unused.
+
+Workflows involved:
+- `.github/workflows/auto-minor-release.yml`: bump minor on merge/push to `main` and create a GitHub Release.
+- `.github/workflows/publish-npm.yml`: publish to npm when a GitHub Release is published.
 
 ## Example Output
 
