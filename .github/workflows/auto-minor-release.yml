@@ -79,16 +79,20 @@ jobs:
         run: npm run build
 
       - name: Check NPM_TOKEN exists
+        id: check-token
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           if [ -z "$NPM_TOKEN" ]; then
-            echo "::error::NPM_TOKEN secret is not set. Please add it to repository secrets."
-            exit 1
+            echo "::warning::NPM_TOKEN secret is not set. Skipping npm publish."
+            echo "token_exists=false" >> $GITHUB_OUTPUT
+          else
+            echo "NPM_TOKEN is configured"
+            echo "token_exists=true" >> $GITHUB_OUTPUT
           fi
-          echo "NPM_TOKEN is configured"
 
       - name: Publish to npm (if version changed)
+        if: steps.check-token.outputs.token_exists == 'true'
         id: npm-publish
         uses: JS-DevTools/npm-publish@v3
         with:
