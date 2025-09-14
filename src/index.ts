@@ -107,8 +107,8 @@ class SonarCloudFeedback {
       try {
         const errorBody = await response.text();
         this.debugLog(`[DEBUG] Response Body: ${errorBody}`);
-      } catch (e) {
-        this.debugLog('[DEBUG] Could not read response body');
+      } catch (error) {
+        this.debugLog(`[DEBUG] Could not read response body: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
   }
