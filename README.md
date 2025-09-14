@@ -1,5 +1,8 @@
 # get-sonar-feedback
 
+![release-on-version](https://github.com/chaspy/get-sonar-feedback/actions/workflows/auto-minor-release.yml/badge.svg)
+[![npm version](https://img.shields.io/npm/v/get-sonar-feedback.svg)](https://www.npmjs.com/package/get-sonar-feedback)
+
 A CLI tool to fetch SonarCloud feedback for pull requests and project-wide analysis directly from your terminal.
 
 ## Features
