@@ -620,11 +620,8 @@ class SonarCloudFeedback {
     }
 
     const showAll = limit >= data.total;
-    console.log(
-      chalk.bold(
-        `\n📋 Detailed Issues (${showAll ? "all" : `first ${limit}`}):`
-      )
-    );
+    const detailsHeader = showAll ? "all" : "first " + String(limit);
+    console.log(chalk.bold(`\n📋 Detailed Issues (${detailsHeader}):`));
 
     const sliceEnd = showAll ? data.issues.length : limit;
     data.issues.slice(0, sliceEnd).forEach((issue, index) => {
