@@ -130,18 +130,29 @@ class SonarCloudFeedback {
       const remoteUrl = execFileSync("git", ["remote", "get-url", "origin"], {
         encoding: "utf-8",
       }).trim();
-      const pattern = new RegExp("github\\.com[/:]([^/]+)/(.+?)(?:\\.git)?$");
-      const match = remoteUrl.match(pattern);
-
-      if (!match) {
+      const host = "github.com";
+      const hostIndex = remoteUrl.indexOf(host);
+      if (hostIndex === -1) {
         throw new Error(
           "Could not parse GitHub repository information from remote URL"
         );
       }
+      let remainder = remoteUrl.slice(hostIndex + host.length);
+      if (remainder.startsWith(":")) remainder = remainder.slice(1);
+      if (remainder.startsWith("/")) remainder = remainder.slice(1);
+      const parts = remainder.split("/");
+      if (parts.length < 2) {
+        throw new Error(
+          "Could not parse GitHub repository information from remote URL"
+        );
+      }
+      const owner = parts[0];
+      let repo = parts[1];
+      if (repo.endsWith(".git")) repo = repo.slice(0, -4);
 
       return {
-        owner: match[1],
-        repo: match[2],
+        owner,
+        repo,
         token: this.getGitHubToken(),
       };
     } catch (error) {
