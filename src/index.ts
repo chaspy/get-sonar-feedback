@@ -91,14 +91,39 @@ class SonarCloudFeedback {
     return process.env.DEBUG === 'true' || process.env.NODE_ENV === 'debug';
   }
 
+  private maskSensitiveInfo(value: string): string {
+    if (value.length <= 6) {
+      return value.substring(0, 1) + '***';
+    }
+    return value.substring(0, value.length - 3) + '***';
+  }
+
   private debugLog(message: string): void {
     if (this.isDebugMode()) {
       console.log(chalk.gray(message));
     }
   }
 
+  private maskUrlSensitiveInfo(url: string): string {
+    // Mask project key and organization in URLs while keeping the structure visible
+    let maskedUrl = url;
+    if (this.sonarConfig.projectKey) {
+      maskedUrl = maskedUrl.replace(
+        this.sonarConfig.projectKey,
+        this.maskSensitiveInfo(this.sonarConfig.projectKey)
+      );
+    }
+    if (this.sonarConfig.organization) {
+      maskedUrl = maskedUrl.replace(
+        this.sonarConfig.organization,
+        this.maskSensitiveInfo(this.sonarConfig.organization)
+      );
+    }
+    return maskedUrl;
+  }
+
   private logApiUrl(apiName: string, url: string): void {
-    this.debugLog(`\n[DEBUG] ${apiName} API URL: ${url}`);
+    this.debugLog(`\n[DEBUG] ${apiName} API URL: ${this.maskUrlSensitiveInfo(url)}`);
   }
 
   private async logErrorResponse(response: Response): Promise<void> {
@@ -285,8 +310,8 @@ class SonarCloudFeedback {
 
     if (this.isDebugMode()) {
       this.debugLog('\n[DEBUG] SonarCloud Configuration:');
-      this.debugLog(`  Project Key: ${this.sonarConfig.projectKey}`);
-      this.debugLog(`  Organization: ${this.sonarConfig.organization}`);
+      this.debugLog(`  Project Key: ${this.maskSensitiveInfo(this.sonarConfig.projectKey)}`);
+      this.debugLog(`  Organization: ${this.maskSensitiveInfo(this.sonarConfig.organization)}`);
       this.debugLog(`  Pull Request: ${prId}`);
     }
 
