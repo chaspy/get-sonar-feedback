@@ -4,6 +4,7 @@ import { Command } from "commander";
 import fetch, { Response } from "node-fetch";
 import chalk from "chalk";
 import { execFileSync } from "child_process";
+import * as packageJson from "../package.json";
 
 interface SonarConfig {
   projectKey: string;
@@ -387,16 +388,22 @@ class SonarCloudFeedback {
     }
   }
 
-  private displayGroupedIssues(data: IssuesResponse): void {
-    const issuesBySeverity = new Map<Severity, typeof data.issues>();
+  private groupIssuesBySeverity(issues: IssuesResponse['issues']): Map<Severity, typeof issues> {
+    const issuesBySeverity = new Map<Severity, typeof issues>();
     
-    data.issues.forEach(issue => {
+    issues.forEach(issue => {
       const severity = this.normalizeSeverity(issue.severity);
       if (!issuesBySeverity.has(severity)) {
         issuesBySeverity.set(severity, []);
       }
       issuesBySeverity.get(severity)!.push(issue);
     });
+    
+    return issuesBySeverity;
+  }
+
+  private displayGroupedIssues(data: IssuesResponse): void {
+    const issuesBySeverity = this.groupIssuesBySeverity(data.issues);
 
     for (const severity of SonarCloudFeedback.SEVERITY_ORDER) {
       const issues = issuesBySeverity.get(severity);
@@ -732,15 +739,7 @@ class SonarCloudFeedback {
     const detailsHeader = showAll ? "all" : "first " + String(limit);
     console.log(chalk.bold(`\n📋 Detailed Issues (${detailsHeader}):`));
 
-    const issuesBySeverity = new Map<Severity, typeof data.issues>();
-    
-    data.issues.forEach(issue => {
-      const severity = this.normalizeSeverity(issue.severity);
-      if (!issuesBySeverity.has(severity)) {
-        issuesBySeverity.set(severity, []);
-      }
-      issuesBySeverity.get(severity)!.push(issue);
-    });
+    const issuesBySeverity = this.groupIssuesBySeverity(data.issues);
 
     let totalDisplayed = 0;
     const targetLimit = showAll ? data.issues.length : limit;
@@ -930,7 +929,7 @@ const program = new Command();
 program
   .name("get-sonar-feedback")
   .description("Fetch SonarCloud feedback")
-  .version("0.3.1");
+  .version(packageJson.version);
 
 program
   .command("pr")
