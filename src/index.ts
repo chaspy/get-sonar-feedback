@@ -709,24 +709,53 @@ class SonarCloudFeedback {
     const detailsHeader = showAll ? "all" : "first " + String(limit);
     console.log(chalk.bold(`\n📋 Detailed Issues (${detailsHeader}):`));
 
-    const sliceEnd = showAll ? data.issues.length : limit;
-    data.issues.slice(0, sliceEnd).forEach((issue, index) => {
-      const severityColored = this.getSeverityColored(issue.severity);
-      const fileName = issue.component.replace(
-        `${this.sonarConfig.projectKey}:`,
-        ""
-      );
-      console.log(`\n${index + 1}. ${severityColored} - ${issue.message}`);
-      console.log(`   File: ${fileName}`);
-      console.log(`   Line: ${issue.line || "N/A"}`);
-      console.log(`   Rule: ${issue.rule}`);
-      if (issue.effort) {
-        console.log(`   Effort: ${issue.effort}`);
+    const severityOrder = ["BLOCKER", "CRITICAL", "MAJOR", "MINOR", "INFO"];
+    
+    const issuesBySeverity = data.issues.reduce((acc, issue) => {
+      const severity = issue.severity.toUpperCase();
+      if (!acc[severity]) {
+        acc[severity] = [];
       }
-    });
+      acc[severity].push(issue);
+      return acc;
+    }, {} as Record<string, typeof data.issues>);
+
+    let totalDisplayed = 0;
+    const targetLimit = showAll ? data.issues.length : limit;
+
+    for (const severity of severityOrder) {
+      const issues = issuesBySeverity[severity];
+      if (!issues || issues.length === 0) continue;
+      if (totalDisplayed >= targetLimit) break;
+
+      console.log(chalk.bold(`\n🔸 ${this.getSeverityColored(severity)} Issues:`));
+      
+      const remainingLimit = targetLimit - totalDisplayed;
+      const issuesToShow = issues.slice(0, remainingLimit);
+      
+      issuesToShow.forEach((issue, index) => {
+        const fileName = issue.component.replace(
+          `${this.sonarConfig.projectKey}:`,
+          ""
+        );
+        console.log(`\n${totalDisplayed + index + 1}. ${issue.message}`);
+        console.log(`   File: ${fileName}`);
+        console.log(`   Line: ${issue.line || "N/A"}`);
+        console.log(`   Rule: ${issue.rule}`);
+        if (issue.effort) {
+          console.log(`   Effort: ${issue.effort}`);
+        }
+      });
+      
+      totalDisplayed += issuesToShow.length;
+      
+      if (issues.length > issuesToShow.length) {
+        console.log(chalk.gray(`   ... and ${issues.length - issuesToShow.length} more ${severity} issues`));
+      }
+    }
 
     if (!showAll && data.total > limit) {
-      console.log(chalk.yellow(`\n... and ${data.total - limit} more issues`));
+      console.log(chalk.yellow(`\n... and ${data.total - totalDisplayed} more issues (use --all to see all)`));
     }
   }
 
@@ -870,7 +899,7 @@ const program = new Command();
 program
   .name("get-sonar-feedback")
   .description("Fetch SonarCloud feedback")
-  .version("0.2.3");
+  .version("0.3.0");
 
 program
   .command("pr")
