@@ -381,8 +381,30 @@ class SonarCloudFeedback {
     console.log(`Debt Total: ${data.debtTotal || 0}`);
 
     if (data.total > 0) {
-      console.log("");
-      data.issues.forEach((issue) => {
+      this.displayGroupedIssues(data);
+    } else {
+      console.log(chalk.green("✅ No issues found."));
+    }
+  }
+
+  private displayGroupedIssues(data: IssuesResponse): void {
+    const issuesBySeverity = new Map<Severity, typeof data.issues>();
+    
+    data.issues.forEach(issue => {
+      const severity = this.normalizeSeverity(issue.severity);
+      if (!issuesBySeverity.has(severity)) {
+        issuesBySeverity.set(severity, []);
+      }
+      issuesBySeverity.get(severity)!.push(issue);
+    });
+
+    for (const severity of SonarCloudFeedback.SEVERITY_ORDER) {
+      const issues = issuesBySeverity.get(severity);
+      if (!issues || issues.length === 0) continue;
+
+      console.log(chalk.bold(`\n🔸 ${this.getSeverityColored(severity)} Issues:`));
+      
+      issues.forEach((issue) => {
         console.log(`Issue Key: ${issue.key}`);
         console.log(`Rule: ${issue.rule}`);
         console.log(`Severity: ${this.getSeverityColored(issue.severity)}`);
@@ -399,8 +421,6 @@ class SonarCloudFeedback {
         console.log(`Tags: ${tagsList}`);
         console.log("-".repeat(50));
       });
-    } else {
-      console.log(chalk.green("✅ No issues found."));
     }
   }
 
@@ -910,7 +930,7 @@ const program = new Command();
 program
   .name("get-sonar-feedback")
   .description("Fetch SonarCloud feedback")
-  .version("0.3.0");
+  .version("0.3.1");
 
 program
   .command("pr")
