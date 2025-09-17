@@ -82,8 +82,11 @@ interface MeasuresResponse {
   };
 }
 
+type Severity = "BLOCKER" | "CRITICAL" | "MAJOR" | "MINOR" | "INFO";
+
 class SonarCloudFeedback {
   private static readonly MAX_DETAILED_ISSUES = 20;
+  private static readonly SEVERITY_ORDER: readonly Severity[] = ["BLOCKER", "CRITICAL", "MAJOR", "MINOR", "INFO"] as const;
   private readonly sonarConfig: SonarConfig;
   private readonly githubConfig: GitHubConfig;
 
@@ -709,24 +712,52 @@ class SonarCloudFeedback {
     const detailsHeader = showAll ? "all" : "first " + String(limit);
     console.log(chalk.bold(`\n📋 Detailed Issues (${detailsHeader}):`));
 
-    const sliceEnd = showAll ? data.issues.length : limit;
-    data.issues.slice(0, sliceEnd).forEach((issue, index) => {
-      const severityColored = this.getSeverityColored(issue.severity);
-      const fileName = issue.component.replace(
-        `${this.sonarConfig.projectKey}:`,
-        ""
-      );
-      console.log(`\n${index + 1}. ${severityColored} - ${issue.message}`);
-      console.log(`   File: ${fileName}`);
-      console.log(`   Line: ${issue.line || "N/A"}`);
-      console.log(`   Rule: ${issue.rule}`);
-      if (issue.effort) {
-        console.log(`   Effort: ${issue.effort}`);
+    const issuesBySeverity = new Map<Severity, typeof data.issues>();
+    
+    data.issues.forEach(issue => {
+      const severity = this.normalizeSeverity(issue.severity);
+      if (!issuesBySeverity.has(severity)) {
+        issuesBySeverity.set(severity, []);
       }
+      issuesBySeverity.get(severity)!.push(issue);
     });
 
+    let totalDisplayed = 0;
+    const targetLimit = showAll ? data.issues.length : limit;
+
+    for (const severity of SonarCloudFeedback.SEVERITY_ORDER) {
+      const issues = issuesBySeverity.get(severity);
+      if (!issues || issues.length === 0) continue;
+      if (totalDisplayed >= targetLimit) break;
+
+      console.log(chalk.bold(`\n🔸 ${this.getSeverityColored(severity)} Issues:`));
+      
+      const remainingLimit = targetLimit - totalDisplayed;
+      const issuesToShow = issues.slice(0, remainingLimit);
+      
+      issuesToShow.forEach((issue, index) => {
+        const fileName = issue.component.replace(
+          `${this.sonarConfig.projectKey}:`,
+          ""
+        );
+        console.log(`\n${totalDisplayed + index + 1}. ${issue.message}`);
+        console.log(`   File: ${fileName}`);
+        console.log(`   Line: ${issue.line || "N/A"}`);
+        console.log(`   Rule: ${issue.rule}`);
+        if (issue.effort) {
+          console.log(`   Effort: ${issue.effort}`);
+        }
+      });
+      
+      totalDisplayed += issuesToShow.length;
+      
+      if (issues.length > issuesToShow.length) {
+        console.log(chalk.gray(`   ... and ${issues.length - issuesToShow.length} more ${severity} issues`));
+      }
+    }
+
     if (!showAll && data.total > limit) {
-      console.log(chalk.yellow(`\n... and ${data.total - limit} more issues`));
+      console.log(chalk.yellow(`\n... and ${data.total - totalDisplayed} more issues (use --all to see all)`));
     }
   }
 
@@ -767,6 +798,15 @@ class SonarCloudFeedback {
       default:
         return severity;
     }
+  }
+
+  private normalizeSeverity(severity: string): Severity {
+    const normalized = severity.toUpperCase() as Severity;
+    if (!SonarCloudFeedback.SEVERITY_ORDER.includes(normalized)) {
+      console.warn(chalk.yellow(`Unknown severity level: ${severity}, treating as INFO`));
+      return "INFO";
+    }
+    return normalized;
   }
 
   private getVulnerabilityColored(probability: string): string {
@@ -870,7 +910,7 @@ const program = new Command();
 program
   .name("get-sonar-feedback")
   .description("Fetch SonarCloud feedback")
-  .version("0.2.3");
+  .version("0.3.0");
 
 program
   .command("pr")
