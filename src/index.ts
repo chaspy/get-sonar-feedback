@@ -82,8 +82,11 @@ interface MeasuresResponse {
   };
 }
 
+type Severity = "BLOCKER" | "CRITICAL" | "MAJOR" | "MINOR" | "INFO";
+
 class SonarCloudFeedback {
   private static readonly MAX_DETAILED_ISSUES = 20;
+  private static readonly SEVERITY_ORDER: readonly Severity[] = ["BLOCKER", "CRITICAL", "MAJOR", "MINOR", "INFO"] as const;
   private readonly sonarConfig: SonarConfig;
   private readonly githubConfig: GitHubConfig;
 
@@ -709,22 +712,21 @@ class SonarCloudFeedback {
     const detailsHeader = showAll ? "all" : "first " + String(limit);
     console.log(chalk.bold(`\n📋 Detailed Issues (${detailsHeader}):`));
 
-    const severityOrder = ["BLOCKER", "CRITICAL", "MAJOR", "MINOR", "INFO"];
+    const issuesBySeverity = new Map<Severity, typeof data.issues>();
     
-    const issuesBySeverity = data.issues.reduce((acc, issue) => {
-      const severity = issue.severity.toUpperCase();
-      if (!acc[severity]) {
-        acc[severity] = [];
+    data.issues.forEach(issue => {
+      const severity = this.normalizeSeverity(issue.severity);
+      if (!issuesBySeverity.has(severity)) {
+        issuesBySeverity.set(severity, []);
       }
-      acc[severity].push(issue);
-      return acc;
-    }, {} as Record<string, typeof data.issues>);
+      issuesBySeverity.get(severity)!.push(issue);
+    });
 
     let totalDisplayed = 0;
     const targetLimit = showAll ? data.issues.length : limit;
 
-    for (const severity of severityOrder) {
-      const issues = issuesBySeverity[severity];
+    for (const severity of SonarCloudFeedback.SEVERITY_ORDER) {
+      const issues = issuesBySeverity.get(severity);
       if (!issues || issues.length === 0) continue;
       if (totalDisplayed >= targetLimit) break;
 
@@ -796,6 +798,15 @@ class SonarCloudFeedback {
       default:
         return severity;
     }
+  }
+
+  private normalizeSeverity(severity: string): Severity {
+    const normalized = severity.toUpperCase() as Severity;
+    if (!SonarCloudFeedback.SEVERITY_ORDER.includes(normalized)) {
+      console.warn(chalk.yellow(`Unknown severity level: ${severity}, treating as INFO`));
+      return "INFO";
+    }
+    return normalized;
   }
 
   private getVulnerabilityColored(probability: string): string {
