@@ -4,6 +4,7 @@ import { Command } from "commander";
 import fetch, { Response } from "node-fetch";
 import chalk from "chalk";
 import { execFileSync } from "child_process";
+import * as packageJson from "../package.json";
 
 interface SonarConfig {
   projectKey: string;
@@ -381,8 +382,36 @@ class SonarCloudFeedback {
     console.log(`Debt Total: ${data.debtTotal || 0}`);
 
     if (data.total > 0) {
-      console.log("");
-      data.issues.forEach((issue) => {
+      this.displayGroupedIssues(data);
+    } else {
+      console.log(chalk.green("✅ No issues found."));
+    }
+  }
+
+  private groupIssuesBySeverity(issues: IssuesResponse['issues']): Map<Severity, typeof issues> {
+    const issuesBySeverity = new Map<Severity, typeof issues>();
+    
+    issues.forEach(issue => {
+      const severity = this.normalizeSeverity(issue.severity);
+      if (!issuesBySeverity.has(severity)) {
+        issuesBySeverity.set(severity, []);
+      }
+      issuesBySeverity.get(severity)!.push(issue);
+    });
+    
+    return issuesBySeverity;
+  }
+
+  private displayGroupedIssues(data: IssuesResponse): void {
+    const issuesBySeverity = this.groupIssuesBySeverity(data.issues);
+
+    for (const severity of SonarCloudFeedback.SEVERITY_ORDER) {
+      const issues = issuesBySeverity.get(severity);
+      if (!issues || issues.length === 0) continue;
+
+      console.log(chalk.bold(`\n🔸 ${this.getSeverityColored(severity)} Issues:`));
+      
+      issues.forEach((issue) => {
         console.log(`Issue Key: ${issue.key}`);
         console.log(`Rule: ${issue.rule}`);
         console.log(`Severity: ${this.getSeverityColored(issue.severity)}`);
@@ -399,8 +428,6 @@ class SonarCloudFeedback {
         console.log(`Tags: ${tagsList}`);
         console.log("-".repeat(50));
       });
-    } else {
-      console.log(chalk.green("✅ No issues found."));
     }
   }
 
@@ -712,15 +739,7 @@ class SonarCloudFeedback {
     const detailsHeader = showAll ? "all" : "first " + String(limit);
     console.log(chalk.bold(`\n📋 Detailed Issues (${detailsHeader}):`));
 
-    const issuesBySeverity = new Map<Severity, typeof data.issues>();
-    
-    data.issues.forEach(issue => {
-      const severity = this.normalizeSeverity(issue.severity);
-      if (!issuesBySeverity.has(severity)) {
-        issuesBySeverity.set(severity, []);
-      }
-      issuesBySeverity.get(severity)!.push(issue);
-    });
+    const issuesBySeverity = this.groupIssuesBySeverity(data.issues);
 
     let totalDisplayed = 0;
     const targetLimit = showAll ? data.issues.length : limit;
@@ -910,7 +929,7 @@ const program = new Command();
 program
   .name("get-sonar-feedback")
   .description("Fetch SonarCloud feedback")
-  .version("0.3.0");
+  .version(packageJson.version);
 
 program
   .command("pr")
