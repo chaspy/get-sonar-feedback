@@ -83,10 +83,25 @@ interface MeasuresResponse {
   };
 }
 
+interface ComponentTreeResponse {
+  components: Array<{
+    key: string;
+    path?: string;
+    measures: Array<{
+      metric: string;
+      value?: string;
+      periods?: Array<{
+        value: string;
+      }>;
+    }>;
+  }>;
+}
+
 type Severity = "BLOCKER" | "CRITICAL" | "MAJOR" | "MINOR" | "INFO";
 
 class SonarCloudFeedback {
   private static readonly MAX_DETAILED_ISSUES = 20;
+  private static readonly MAX_COVERAGE_DETAIL_FILES = 10;
   private static readonly SEVERITY_ORDER: readonly Severity[] = ["BLOCKER", "CRITICAL", "MAJOR", "MINOR", "INFO"] as const;
   private readonly sonarConfig: SonarConfig;
   private readonly githubConfig: GitHubConfig;
@@ -560,6 +575,91 @@ class SonarCloudFeedback {
     if (!hasData) {
       console.log("Coverage data not available.");
     }
+
+    await this.fetchCoverageDetails(prId);
+  }
+
+  private async fetchCoverageDetails(prId: string): Promise<void> {
+    console.log(chalk.bold("\n🔍 Files Missing Coverage (New Code)"));
+    console.log("-".repeat(50));
+
+    const metrics = "new_coverage,new_lines_to_cover,new_uncovered_lines";
+    const url = `https://sonarcloud.io/api/measures/component_tree?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&pullRequest=${prId}&qualifiers=FIL&ps=500&metricSort=new_uncovered_lines&asc=false`;
+    this.logApiUrl("Coverage File Details", url);
+
+    try {
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${this.sonarConfig.token}`,
+        },
+      });
+
+      if (!response.ok) {
+        await this.logErrorResponse(response);
+        throw new Error(`Coverage detail API returned ${response.status}`);
+      }
+
+      const data = (await response.json()) as ComponentTreeResponse;
+      const components = data.components || [];
+
+      const filesWithUncovered = components
+        .map((component) => {
+          const measures = component.measures || [];
+          const uncovered = this.getMeasureNumber(measures, "new_uncovered_lines") ?? 0;
+          const linesToCover = this.getMeasureNumber(measures, "new_lines_to_cover");
+          const coverage = this.getMeasureNumber(measures, "new_coverage");
+          const path = component.path || component.key.replace(`${this.sonarConfig.projectKey}:`, "");
+          return {
+            path,
+            uncovered,
+            linesToCover,
+            coverage,
+          };
+        })
+        .filter((file) => file.uncovered > 0)
+        .sort((a, b) => b.uncovered - a.uncovered);
+
+      if (filesWithUncovered.length === 0) {
+        console.log(chalk.green("No files with uncovered lines were reported for new code."));
+        return;
+      }
+
+      const limit = SonarCloudFeedback.MAX_COVERAGE_DETAIL_FILES;
+      filesWithUncovered.slice(0, limit).forEach((file, index) => {
+        const coverageText =
+          file.coverage !== undefined && !Number.isNaN(file.coverage)
+            ? `${file.coverage.toFixed(1)}%`
+            : "N/A";
+        const linesToCoverText =
+          file.linesToCover !== undefined && !Number.isNaN(file.linesToCover)
+            ? file.linesToCover.toString()
+            : "N/A";
+
+        console.log(`${index + 1}. ${file.path}`);
+        console.log(
+          `   Uncovered Lines: ${file.uncovered} / Lines to Cover: ${linesToCoverText} (New Coverage: ${coverageText})`
+        );
+      });
+
+      if (filesWithUncovered.length > limit) {
+        console.log(
+          chalk.gray(
+            `... and ${filesWithUncovered.length - limit} more files have uncovered lines`
+          )
+        );
+      }
+    } catch (error) {
+      console.warn(
+        chalk.yellow(
+          `Failed to fetch coverage details: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        )
+      );
+      if (this.isDebugMode()) {
+        console.warn(chalk.gray("Re-run with DEBUG=true for detailed response logs."));
+      }
+    }
   }
 
   private async fetchProjectMetrics(branch: string): Promise<void> {
@@ -817,6 +917,26 @@ class SonarCloudFeedback {
       default:
         return severity;
     }
+  }
+
+  private getMeasureNumber(
+    measures: Array<{
+      metric: string;
+      value?: string;
+      periods?: Array<{
+        value: string;
+      }>;
+    }>,
+    metric: string
+  ): number | undefined {
+    const measure = measures.find((m) => m.metric === metric);
+    if (!measure) return undefined;
+
+    const rawValue = measure.periods?.[0]?.value ?? (measure as any).value;
+    if (rawValue === undefined) return undefined;
+
+    const parsed = Number(rawValue);
+    return Number.isNaN(parsed) ? undefined : parsed;
   }
 
   private normalizeSeverity(severity: string): Severity {
