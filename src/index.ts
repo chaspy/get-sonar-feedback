@@ -195,6 +195,14 @@ class SonarCloudFeedback {
     this.githubConfig = this.getGitHubConfig();
   }
 
+  private getAuthHeader(): { Authorization: string } {
+    return {
+      Authorization: `Basic ${Buffer.from(`${this.sonarConfig.token}:`).toString(
+        "base64"
+      )}`,
+    };
+  }
+
   private getGitHubConfig(): GitHubConfig {
     try {
       const remoteUrl = execFileSync("git", ["remote", "get-url", "origin"], {
@@ -337,11 +345,7 @@ class SonarCloudFeedback {
     const url = `https://sonarcloud.io/api/qualitygates/project_status?projectKey=${this.sonarConfig.projectKey}&pullRequest=${prId}`;
     this.logApiUrl('Quality Gate', url);
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${this.sonarConfig.token}`,
-      },
-    });
+    const response = await fetch(url, { headers: this.getAuthHeader() });
 
     if (!response.ok) {
       await this.logErrorResponse(response);
@@ -379,9 +383,7 @@ class SonarCloudFeedback {
 
     const response = await fetch(url, {
       headers: {
-        Authorization: `Basic ${Buffer.from(
-          `${this.sonarConfig.token}:`
-        ).toString("base64")}`,
+        ...this.getAuthHeader(),
       },
     });
 
@@ -453,11 +455,7 @@ class SonarCloudFeedback {
     const url = `https://sonarcloud.io/api/hotspots/search?projectKey=${this.sonarConfig.projectKey}&pullRequest=${prId}`;
     this.logApiUrl('Hotspots', url);
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${this.sonarConfig.token}`,
-      },
-    });
+    const response = await fetch(url, { headers: this.getAuthHeader() });
 
     if (!response.ok) {
       await this.logErrorResponse(response);
@@ -503,11 +501,7 @@ class SonarCloudFeedback {
     const url = `https://sonarcloud.io/api/measures/component?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&pullRequest=${prId}`;
     this.logApiUrl('Duplication Metrics', url);
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${this.sonarConfig.token}`,
-      },
-    });
+    const response = await fetch(url, { headers: this.getAuthHeader() });
 
     if (!response.ok) {
       await this.logErrorResponse(response);
@@ -540,11 +534,7 @@ class SonarCloudFeedback {
     const url = `https://sonarcloud.io/api/measures/component?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&pullRequest=${prId}`;
     this.logApiUrl('Coverage Metrics', url);
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${this.sonarConfig.token}`,
-      },
-    });
+    const response = await fetch(url, { headers: this.getAuthHeader() });
 
     if (!response.ok) {
       await this.logErrorResponse(response);
@@ -588,11 +578,7 @@ class SonarCloudFeedback {
     this.logApiUrl("Coverage File Details", url);
 
     try {
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${this.sonarConfig.token}`,
-        },
-      });
+      const response = await fetch(url, { headers: this.getAuthHeader() });
 
       if (!response.ok) {
         await this.logErrorResponse(response);
@@ -684,11 +670,7 @@ class SonarCloudFeedback {
 
     const url = `https://sonarcloud.io/api/measures/component?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&branch=${branch}`;
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${this.sonarConfig.token}`,
-      },
-    });
+    const response = await fetch(url, { headers: this.getAuthHeader() });
 
     if (!response.ok) {
       throw new Error(`Project Metrics API returned ${response.status}`);
@@ -769,14 +751,7 @@ class SonarCloudFeedback {
   private async fetchIssuesData(branch: string): Promise<IssuesResponse> {
     const url = `https://sonarcloud.io/api/issues/search?componentKeys=${this.sonarConfig.projectKey}&branch=${branch}&organization=${this.sonarConfig.organization}&resolved=false&ps=500`;
 
-    const basicAuth = Buffer.from(`${this.sonarConfig.token}:`).toString(
-      "base64"
-    );
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Basic ${basicAuth}`,
-      },
-    });
+    const response = await fetch(url, { headers: this.getAuthHeader() });
 
     if (!response.ok) {
       throw new Error(`Issues API returned ${response.status}`);
