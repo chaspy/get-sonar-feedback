@@ -6,7 +6,6 @@ import chalk from "chalk";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import * as packageJson from "../package.json";
-import { parseMeasureNumber } from "./measure-utils";
 import {
   buildCoverageDetailsUrl,
   ComponentTreeResponse,
@@ -148,10 +147,16 @@ class SonarCloudFeedback {
 
   static getBuildId(): string {
     const repoRoot = path.resolve(__dirname, "..");
+    const safePath = "/usr/bin:/bin:/usr/local/bin";
     try {
-      return execFileSync("git", ["-C", repoRoot, "rev-parse", "--short", "HEAD"], {
-        encoding: "utf-8",
-      }).trim();
+      return execFileSync(
+        "git",
+        ["-C", repoRoot, "rev-parse", "--short", "HEAD"],
+        {
+          encoding: "utf-8",
+          env: { ...process.env, PATH: safePath },
+        }
+      ).trim();
     } catch {
       return "unknown";
     }
