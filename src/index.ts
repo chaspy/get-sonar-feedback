@@ -5,6 +5,7 @@ import fetch, { Response } from "node-fetch";
 import chalk from "chalk";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
+import fs from "node:fs";
 import * as packageJson from "../package.json";
 import {
   buildCoverageDetailsUrl,
@@ -145,18 +146,23 @@ class SonarCloudFeedback {
     this.debugLog(`\n[DEBUG] ${apiName} API URL: ${this.maskUrlSensitiveInfo(url)}`);
   }
 
+  private static resolveGitPath(): string {
+    const candidates = [
+      "/usr/bin/git",
+      "/usr/local/bin/git",
+      "/opt/homebrew/bin/git",
+    ];
+    const found = candidates.find((p) => fs.existsSync(p));
+    return found ?? "git";
+  }
+
   static getBuildId(): string {
     const repoRoot = path.resolve(__dirname, "..");
-    const safePath = "/usr/bin:/bin:/usr/local/bin";
     try {
-      return execFileSync(
-        "git",
-        ["-C", repoRoot, "rev-parse", "--short", "HEAD"],
-        {
-          encoding: "utf-8",
-          env: { PATH: safePath },
-        }
-      ).trim();
+      const gitPath = this.resolveGitPath();
+      return execFileSync(gitPath, ["-C", repoRoot, "rev-parse", "--short", "HEAD"], {
+        encoding: "utf-8",
+      }).trim();
     } catch {
       return "unknown";
     }
