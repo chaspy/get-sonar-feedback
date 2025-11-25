@@ -342,7 +342,7 @@ class SonarCloudFeedback {
       this.debugLog(`  Pull Request: ${prId}`);
     }
 
-    const url = `https://sonarcloud.io/api/qualitygates/project_status?projectKey=${this.sonarConfig.projectKey}&pullRequest=${prId}`;
+    const url = `https://sonarcloud.io/api/qualitygates/project_status?projectKey=${this.sonarConfig.projectKey}&pullRequest=${prId}&organization=${this.sonarConfig.organization}`;
     this.logApiUrl('Quality Gate', url);
 
     const response = await fetch(url, { headers: this.getAuthHeader() });
@@ -498,7 +498,7 @@ class SonarCloudFeedback {
 
     const metrics =
       "new_duplicated_lines_density,new_duplicated_lines,new_duplicated_blocks";
-    const url = `https://sonarcloud.io/api/measures/component?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&pullRequest=${prId}`;
+    const url = `https://sonarcloud.io/api/measures/component?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&pullRequest=${prId}&organization=${this.sonarConfig.organization}`;
     this.logApiUrl('Duplication Metrics', url);
 
     const response = await fetch(url, { headers: this.getAuthHeader() });
@@ -531,7 +531,7 @@ class SonarCloudFeedback {
     console.log("-".repeat(50));
 
     const metrics = "new_coverage,new_lines_to_cover,new_uncovered_lines";
-    const url = `https://sonarcloud.io/api/measures/component?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&pullRequest=${prId}`;
+    const url = `https://sonarcloud.io/api/measures/component?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&pullRequest=${prId}&organization=${this.sonarConfig.organization}`;
     this.logApiUrl('Coverage Metrics', url);
 
     const response = await fetch(url, { headers: this.getAuthHeader() });
@@ -574,7 +574,7 @@ class SonarCloudFeedback {
     console.log("-".repeat(50));
 
     const metrics = "new_coverage,new_lines_to_cover,new_uncovered_lines";
-    const url = `https://sonarcloud.io/api/measures/component_tree?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&pullRequest=${prId}&qualifiers=FIL&ps=500&metricSort=new_uncovered_lines&asc=false`;
+    const url = `https://sonarcloud.io/api/measures/component_tree?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&pullRequest=${prId}&organization=${this.sonarConfig.organization}&qualifiers=FIL&ps=500&metricSort=new_uncovered_lines&asc=false`;
     this.logApiUrl("Coverage File Details", url);
 
     try {
