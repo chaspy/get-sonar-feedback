@@ -1,4 +1,4 @@
-import assert from "assert";
+import assert from "node:assert";
 import { parseMeasureNumber, Measure } from "../src/measure-utils";
 
 type M = Measure;

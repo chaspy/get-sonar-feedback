@@ -126,8 +126,9 @@ class SonarCloudFeedback {
   }
 
   private getSonarAuthHeader(): { Authorization: string } {
+    const basicToken = Buffer.from(this.sonarConfig.token + ":", "utf8").toString("base64");
     return {
-      Authorization: `Basic ${Buffer.from(`${this.sonarConfig.token}:`).toString("base64")}`,
+      Authorization: "Basic " + basicToken,
     };
   }
 
