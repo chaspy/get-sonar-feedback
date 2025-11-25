@@ -5,6 +5,7 @@ import fetch, { Response } from "node-fetch";
 import chalk from "chalk";
 import { execFileSync } from "node:child_process";
 import * as packageJson from "../package.json";
+import { parseMeasureNumber } from "./measure-utils";
 
 interface SonarConfig {
   projectKey: string;
@@ -102,6 +103,7 @@ type Severity = "BLOCKER" | "CRITICAL" | "MAJOR" | "MINOR" | "INFO";
 class SonarCloudFeedback {
   private static readonly MAX_DETAILED_ISSUES = 20;
   private static readonly MAX_COVERAGE_DETAIL_FILES = 10;
+  private static readonly COMPONENT_TREE_PAGE_SIZE = 500; // Fetch enough files to sort by uncovered lines even though we display top 10
   private static readonly SEVERITY_ORDER: readonly Severity[] = ["BLOCKER", "CRITICAL", "MAJOR", "MINOR", "INFO"] as const;
   private readonly sonarConfig: SonarConfig;
   private readonly githubConfig: GitHubConfig;
@@ -121,6 +123,12 @@ class SonarCloudFeedback {
     if (this.isDebugMode()) {
       console.log(chalk.gray(message));
     }
+  }
+
+  private getSonarAuthHeader(): { Authorization: string } {
+    return {
+      Authorization: `Basic ${Buffer.from(`${this.sonarConfig.token}:`).toString("base64")}`,
+    };
   }
 
   private maskUrlSensitiveInfo(url: string): string {
@@ -337,11 +345,7 @@ class SonarCloudFeedback {
     const url = `https://sonarcloud.io/api/qualitygates/project_status?projectKey=${this.sonarConfig.projectKey}&pullRequest=${prId}`;
     this.logApiUrl('Quality Gate', url);
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${this.sonarConfig.token}`,
-      },
-    });
+    const response = await fetch(url, { headers: this.getSonarAuthHeader() });
 
     if (!response.ok) {
       await this.logErrorResponse(response);
@@ -377,13 +381,7 @@ class SonarCloudFeedback {
     const url = `https://sonarcloud.io/api/issues/search?componentKeys=${this.sonarConfig.projectKey}&pullRequest=${prId}&organization=${this.sonarConfig.organization}&resolved=false&ps=500`;
     this.logApiUrl('Issues', url);
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Basic ${Buffer.from(
-          this.sonarConfig.token + ":"
-        ).toString("base64")}`,
-      },
-    });
+    const response = await fetch(url, { headers: this.getSonarAuthHeader() });
 
     if (!response.ok) {
       await this.logErrorResponse(response);
@@ -453,11 +451,7 @@ class SonarCloudFeedback {
     const url = `https://sonarcloud.io/api/hotspots/search?projectKey=${this.sonarConfig.projectKey}&pullRequest=${prId}`;
     this.logApiUrl('Hotspots', url);
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${this.sonarConfig.token}`,
-      },
-    });
+    const response = await fetch(url, { headers: this.getSonarAuthHeader() });
 
     if (!response.ok) {
       await this.logErrorResponse(response);
@@ -503,11 +497,7 @@ class SonarCloudFeedback {
     const url = `https://sonarcloud.io/api/measures/component?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&pullRequest=${prId}`;
     this.logApiUrl('Duplication Metrics', url);
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${this.sonarConfig.token}`,
-      },
-    });
+    const response = await fetch(url, { headers: this.getSonarAuthHeader() });
 
     if (!response.ok) {
       await this.logErrorResponse(response);
@@ -540,11 +530,7 @@ class SonarCloudFeedback {
     const url = `https://sonarcloud.io/api/measures/component?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&pullRequest=${prId}`;
     this.logApiUrl('Coverage Metrics', url);
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${this.sonarConfig.token}`,
-      },
-    });
+    const response = await fetch(url, { headers: this.getSonarAuthHeader() });
 
     if (!response.ok) {
       await this.logErrorResponse(response);
@@ -584,15 +570,11 @@ class SonarCloudFeedback {
     console.log("-".repeat(50));
 
     const metrics = "new_coverage,new_lines_to_cover,new_uncovered_lines";
-    const url = `https://sonarcloud.io/api/measures/component_tree?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&pullRequest=${prId}&qualifiers=FIL&ps=500&metricSort=new_uncovered_lines&asc=false`;
+    const url = `https://sonarcloud.io/api/measures/component_tree?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&pullRequest=${prId}&organization=${this.sonarConfig.organization}&qualifiers=FIL&ps=${SonarCloudFeedback.COMPONENT_TREE_PAGE_SIZE}&metricSort=new_uncovered_lines&asc=false`;
     this.logApiUrl("Coverage File Details", url);
 
     try {
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${this.sonarConfig.token}`,
-        },
-      });
+      const response = await fetch(url, { headers: this.getSonarAuthHeader() });
 
       if (!response.ok) {
         await this.logErrorResponse(response);
@@ -605,9 +587,9 @@ class SonarCloudFeedback {
       const filesWithUncovered = components
         .map((component) => {
           const measures = component.measures || [];
-          const uncovered = this.getMeasureNumber(measures, "new_uncovered_lines") ?? 0;
-          const linesToCover = this.getMeasureNumber(measures, "new_lines_to_cover");
-          const coverage = this.getMeasureNumber(measures, "new_coverage");
+          const uncovered = parseMeasureNumber(measures, "new_uncovered_lines") ?? 0;
+          const linesToCover = parseMeasureNumber(measures, "new_lines_to_cover");
+          const coverage = parseMeasureNumber(measures, "new_coverage");
           const path = component.path || component.key.replace(`${this.sonarConfig.projectKey}:`, "");
           return {
             path,
@@ -656,9 +638,7 @@ class SonarCloudFeedback {
           }`
         )
       );
-      if (this.isDebugMode()) {
-        console.warn(chalk.gray("Re-run with DEBUG=true for detailed response logs."));
-      }
+      console.warn(chalk.gray("DEBUG=true を付けて再実行するとレスポンス詳細が表示されます。"));
     }
   }
 
@@ -684,11 +664,7 @@ class SonarCloudFeedback {
 
     const url = `https://sonarcloud.io/api/measures/component?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&branch=${branch}`;
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${this.sonarConfig.token}`,
-      },
-    });
+    const response = await fetch(url, { headers: this.getSonarAuthHeader() });
 
     if (!response.ok) {
       throw new Error(`Project Metrics API returned ${response.status}`);
@@ -769,14 +745,7 @@ class SonarCloudFeedback {
   private async fetchIssuesData(branch: string): Promise<IssuesResponse> {
     const url = `https://sonarcloud.io/api/issues/search?componentKeys=${this.sonarConfig.projectKey}&branch=${branch}&organization=${this.sonarConfig.organization}&resolved=false&ps=500`;
 
-    const basicAuth = Buffer.from(this.sonarConfig.token + ":").toString(
-      "base64"
-    );
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Basic ${basicAuth}`,
-      },
-    });
+    const response = await fetch(url, { headers: this.getSonarAuthHeader() });
 
     if (!response.ok) {
       throw new Error(`Issues API returned ${response.status}`);
@@ -917,26 +886,6 @@ class SonarCloudFeedback {
       default:
         return severity;
     }
-  }
-
-  private getMeasureNumber(
-    measures: Array<{
-      metric: string;
-      value?: string;
-      periods?: Array<{
-        value: string;
-      }>;
-    }>,
-    metric: string
-  ): number | undefined {
-    const measure = measures.find((m) => m.metric === metric);
-    if (!measure) return undefined;
-
-    const rawValue = measure.periods?.[0]?.value ?? (measure as any).value;
-    if (rawValue === undefined) return undefined;
-
-    const parsed = Number(rawValue);
-    return Number.isNaN(parsed) ? undefined : parsed;
   }
 
   private normalizeSeverity(severity: string): Severity {
