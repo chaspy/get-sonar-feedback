@@ -3,7 +3,7 @@
 import { Command } from "commander";
 import fetch, { Response } from "node-fetch";
 import chalk from "chalk";
-import { execFileSync } from "child_process";
+import { execFileSync } from "node:child_process";
 import * as packageJson from "../package.json";
 
 interface SonarConfig {
@@ -380,7 +380,7 @@ class SonarCloudFeedback {
     const response = await fetch(url, {
       headers: {
         Authorization: `Basic ${Buffer.from(
-          `${this.sonarConfig.token}:`
+          this.sonarConfig.token + ":"
         ).toString("base64")}`,
       },
     });
@@ -739,8 +739,8 @@ class SonarCloudFeedback {
           console.log(`📄 Lines of Code: ${value}`);
           break;
         case "sqale_index": {
-          const hours = Math.round(parseInt(value) / 60);
-          const minutes = parseInt(value) % 60;
+          const hours = Math.round(Number.parseInt(value, 10) / 60);
+          const minutes = Number.parseInt(value, 10) % 60;
           console.log(`⏱️  Technical Debt: ${hours}h ${minutes}min`);
           break;
         }
@@ -769,7 +769,7 @@ class SonarCloudFeedback {
   private async fetchIssuesData(branch: string): Promise<IssuesResponse> {
     const url = `https://sonarcloud.io/api/issues/search?componentKeys=${this.sonarConfig.projectKey}&branch=${branch}&organization=${this.sonarConfig.organization}&resolved=false&ps=500`;
 
-    const basicAuth = Buffer.from(`${this.sonarConfig.token}:`).toString(
+    const basicAuth = Buffer.from(this.sonarConfig.token + ":").toString(
       "base64"
     );
     const response = await fetch(url, {
@@ -1087,7 +1087,7 @@ program
     if (options.all) {
       limit = Number.MAX_SAFE_INTEGER;
     } else if (options.limit !== undefined) {
-      const parsed = parseInt(options.limit, 10);
+      const parsed = Number.parseInt(options.limit, 10);
       if (Number.isNaN(parsed) || parsed < 0) {
         console.log(chalk.yellow("Invalid --limit value; using default."));
       } else {
