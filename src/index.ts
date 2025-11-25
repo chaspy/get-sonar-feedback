@@ -4,8 +4,14 @@ import { Command } from "commander";
 import fetch, { Response } from "node-fetch";
 import chalk from "chalk";
 import { execFileSync } from "node:child_process";
+import path from "node:path";
+import fs from "node:fs";
 import * as packageJson from "../package.json";
-import { parseMeasureNumber } from "./measure-utils";
+import {
+  buildCoverageDetailsUrl,
+  ComponentTreeResponse,
+  extractCoverageFileDetails,
+} from "./coverage-utils";
 
 interface SonarConfig {
   projectKey: string;
@@ -84,20 +90,6 @@ interface MeasuresResponse {
   };
 }
 
-interface ComponentTreeResponse {
-  components: Array<{
-    key: string;
-    path?: string;
-    measures: Array<{
-      metric: string;
-      value?: string;
-      periods?: Array<{
-        value: string;
-      }>;
-    }>;
-  }>;
-}
-
 type Severity = "BLOCKER" | "CRITICAL" | "MAJOR" | "MINOR" | "INFO";
 
 class SonarCloudFeedback {
@@ -152,6 +144,28 @@ class SonarCloudFeedback {
 
   private logApiUrl(apiName: string, url: string): void {
     this.debugLog(`\n[DEBUG] ${apiName} API URL: ${this.maskUrlSensitiveInfo(url)}`);
+  }
+
+  private static resolveGitPath(): string {
+    const candidates = [
+      "/usr/bin/git",
+      "/usr/local/bin/git",
+      "/opt/homebrew/bin/git",
+    ];
+    const found = candidates.find((p) => fs.existsSync(p));
+    return found ?? "git";
+  }
+
+  static getBuildId(): string {
+    const repoRoot = path.resolve(__dirname, "..");
+    try {
+      const gitPath = this.resolveGitPath();
+      return execFileSync(gitPath, ["-C", repoRoot, "rev-parse", "--short", "HEAD"], {
+        encoding: "utf-8",
+      }).trim();
+    } catch {
+      return "unknown";
+    }
   }
 
   private async logErrorResponse(response: Response): Promise<void> {
@@ -570,8 +584,12 @@ class SonarCloudFeedback {
     console.log(chalk.bold("\n🔍 Files Missing Coverage (New Code)"));
     console.log("-".repeat(50));
 
-    const metrics = "new_coverage,new_lines_to_cover,new_uncovered_lines";
-    const url = `https://sonarcloud.io/api/measures/component_tree?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&pullRequest=${prId}&organization=${this.sonarConfig.organization}&qualifiers=FIL&ps=${SonarCloudFeedback.COMPONENT_TREE_PAGE_SIZE}&metricSort=new_uncovered_lines&s=metric&metricSortFilter=withMeasuresOnly&asc=false`;
+    const url = buildCoverageDetailsUrl(
+      this.sonarConfig.projectKey,
+      this.sonarConfig.organization,
+      prId,
+      SonarCloudFeedback.COMPONENT_TREE_PAGE_SIZE
+    );
     this.logApiUrl("Coverage File Details", url);
 
     try {
@@ -584,24 +602,10 @@ class SonarCloudFeedback {
       }
 
       const data = (await response.json()) as ComponentTreeResponse;
-      const components = data.components || [];
-
-      const filesWithUncovered = components
-        .map((component) => {
-          const measures = component.measures || [];
-          const uncovered = parseMeasureNumber(measures, "new_uncovered_lines") ?? 0;
-          const linesToCover = parseMeasureNumber(measures, "new_lines_to_cover");
-          const coverage = parseMeasureNumber(measures, "new_coverage");
-          const path = component.path || component.key.replace(`${this.sonarConfig.projectKey}:`, "");
-          return {
-            path,
-            uncovered,
-            linesToCover,
-            coverage,
-          };
-        })
-        .filter((file) => file.uncovered > 0)
-        .sort((a, b) => b.uncovered - a.uncovered);
+      const filesWithUncovered = extractCoverageFileDetails(
+        data,
+        this.sonarConfig.projectKey
+      );
 
       if (filesWithUncovered.length === 0) {
         console.log(chalk.green("No files with uncovered lines were reported for new code."));
@@ -1000,7 +1004,7 @@ const program = new Command();
 program
   .name("get-sonar-feedback")
   .description("Fetch SonarCloud feedback")
-  .version(packageJson.version);
+  .version(`${packageJson.version} (build ${SonarCloudFeedback.getBuildId()})`);
 
 program
   .command("pr")

@@ -1,6 +1,6 @@
 {
   "name": "get-sonar-feedback",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "A CLI tool to fetch SonarCloud feedback for pull requests",
   "main": "dist/index.js",
   "bin": {
@@ -10,7 +10,7 @@
     "build": "tsc",
     "dev": "ts-node src/index.ts",
     "prepublishOnly": "npm run build",
-    "test": "ts-node test/parseMeasureNumber.test.ts"
+    "test": "ts-node test/parseMeasureNumber.test.ts && ts-node test/coverage-utils.test.ts"
   },
   "keywords": [
     "sonarcloud",
