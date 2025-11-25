@@ -571,15 +571,16 @@ class SonarCloudFeedback {
     console.log("-".repeat(50));
 
     const metrics = "new_coverage,new_lines_to_cover,new_uncovered_lines";
-    const url = `https://sonarcloud.io/api/measures/component_tree?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&pullRequest=${prId}&organization=${this.sonarConfig.organization}&qualifiers=FIL&ps=${SonarCloudFeedback.COMPONENT_TREE_PAGE_SIZE}&metricSort=new_uncovered_lines&asc=false`;
+    const url = `https://sonarcloud.io/api/measures/component_tree?component=${this.sonarConfig.projectKey}&metricKeys=${metrics}&pullRequest=${prId}&organization=${this.sonarConfig.organization}&qualifiers=FIL&ps=${SonarCloudFeedback.COMPONENT_TREE_PAGE_SIZE}&metricSort=new_uncovered_lines&metricSortFilter=withMeasuresOnly&asc=false`;
     this.logApiUrl("Coverage File Details", url);
 
     try {
       const response = await fetch(url, { headers: this.getSonarAuthHeader() });
 
       if (!response.ok) {
+        const body = await response.text();
         await this.logErrorResponse(response);
-        throw new Error(`Coverage detail API returned ${response.status}`);
+        throw new Error(`Coverage detail API returned ${response.status}: ${body}`);
       }
 
       const data = (await response.json()) as ComponentTreeResponse;
