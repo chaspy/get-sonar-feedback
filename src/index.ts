@@ -154,7 +154,7 @@ class SonarCloudFeedback {
         ["-C", repoRoot, "rev-parse", "--short", "HEAD"],
         {
           encoding: "utf-8",
-          env: { ...process.env, PATH: safePath },
+          env: { PATH: safePath },
         }
       ).trim();
     } catch {
