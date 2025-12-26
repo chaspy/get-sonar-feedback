@@ -1,0 +1,109 @@
+name: release-on-version
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Configure git user
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+
+      - name: Read package.json version
+        id: pkg
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f package.json ]]; then
+            echo "package.json not found" >&2
+            exit 1
+          fi
+          VERSION=$(node -e "console.log(require('./package.json').version)")
+          if [[ -z "${VERSION}" ]]; then
+            echo "version is empty" >&2
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch tags
+        run: git fetch --tags --quiet
+
+      - name: Create Git tag if missing
+        id: tag
+        run: |
+          TAG=v${{ steps.pkg.outputs.version }}
+          if git rev-parse -q --verify refs/tags/$TAG >/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          git tag $TAG
+          git push origin $TAG
+          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Release ${{ steps.tag.outputs.tag }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: steps.tag.outputs.exists == 'false'
+
+      - name: Install deps (for publish)
+        run: npm ci --no-audit --no-fund
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Make binary executable
+        run: chmod +x dist/index.js
+
+      - name: Check NPM_TOKEN exists
+        id: check-token
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "::warning::NPM_TOKEN secret is not set. Skipping npm publish."
+            echo "token_exists=false" >> $GITHUB_OUTPUT
+          else
+            echo "NPM_TOKEN is configured"
+            echo "token_exists=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish to npm (if version changed)
+        if: steps.check-token.outputs.token_exists == 'true'
+        id: npm-publish
+        uses: JS-DevTools/npm-publish@v3
+        with:
+          token: ${{ secrets.NPM_TOKEN }}
+          access: public
+
+      - name: Log publish result
+        if: steps.npm-publish.outputs.type
+        run: |
+          echo "Published new version: ${{ steps.npm-publish.outputs.version }}"
+          echo "Package type: ${{ steps.npm-publish.outputs.type }}"

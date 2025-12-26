@@ -1,6 +1,6 @@
 {
   "name": "get-sonar-feedback",
-  "version": "0.2.0",
+  "version": "0.5.0",
   "description": "A CLI tool to fetch SonarCloud feedback for pull requests",
   "main": "dist/index.js",
   "bin": {
@@ -9,7 +9,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "ts-node src/index.ts",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test": "ts-node test/parseMeasureNumber.test.ts && ts-node test/coverage-utils.test.ts"
   },
   "keywords": [
     "sonarcloud",
@@ -17,8 +18,16 @@
     "cli",
     "pull-request"
   ],
-  "author": "",
+  "author": "chaspy",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chaspy/get-sonar-feedback.git"
+  },
+  "homepage": "https://github.com/chaspy/get-sonar-feedback#readme",
+  "bugs": {
+    "url": "https://github.com/chaspy/get-sonar-feedback/issues"
+  },
   "dependencies": {
     "commander": "^11.1.0",
     "node-fetch": "^2.7.0",
@@ -31,6 +40,6 @@
     "ts-node": "^10.9.2"
   },
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=14.13.1"
   }
 }
