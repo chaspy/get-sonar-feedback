@@ -10,6 +10,7 @@ A CLI tool to fetch SonarCloud feedback for pull requests directly from your ter
 - 🔄 Code duplication metrics
 - 📊 Test coverage reporting
 - 🔍 Auto-detect PR number from current git branch
+- 📦 JSON output for automation (`--json`)
 
 ## Installation
 
@@ -34,6 +35,12 @@ get-sonar-feedback 123
 
 # Auto-detect PR from current branch
 get-sonar-feedback
+
+# JSON output
+get-sonar-feedback --json
+
+# JSON output to file (still prints to stdout)
+get-sonar-feedback --json --output /tmp/sonar-feedback.json
 ```
 
 ## Configuration
@@ -98,6 +105,51 @@ Uncovered Lines: 29
 ==========================================
 Analysis Complete
 ==========================================
+```
+
+## JSON Output
+
+Use `--json` to emit machine-readable output to stdout only.
+
+```bash
+get-sonar-feedback --json
+```
+
+Example (truncated):
+
+```json
+{
+  "meta": {
+    "projectKey": "studiuos-jp_Studious_JP",
+    "organization": "studiuos-jp",
+    "branch": "main",
+    "pullRequest": "123",
+    "generatedAt": "2025-12-26T12:34:56.789Z"
+  },
+  "issues": [
+    {
+      "key": "AY1234567890",
+      "rule": "typescript:S1234",
+      "severity": "MINOR",
+      "type": "CODE_SMELL",
+      "component": "studiuos-jp_Studious_JP:src/index.ts",
+      "filePath": "src/index.ts",
+      "line": 42,
+      "message": "Remove this unused variable",
+      "effort": "5min",
+      "debt": "5min",
+      "tags": ["unused"],
+      "creationDate": "2025-12-25T01:02:03+0000",
+      "updateDate": "2025-12-25T01:02:03+0000"
+    }
+  ],
+  "metrics": {
+    "coverage": 85.5,
+    "new_coverage": 90.1,
+    "new_lines_to_cover": 200,
+    "new_uncovered_lines": 20
+  }
+}
 ```
 
 ## Development
