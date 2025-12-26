@@ -731,7 +731,7 @@ const program = new Command();
 program
   .name('get-sonar-feedback')
   .description('Fetch SonarCloud feedback for pull requests')
-  .version('1.0.0')
+  .version('0.2.0')
   .argument('[pr-number]', 'Pull request number (optional, will auto-detect if not provided)')
   .option('--json', 'Output results as JSON')
   .option('--output <path>', 'Write JSON output to a file (enables --json)')
