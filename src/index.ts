@@ -184,13 +184,15 @@ class SonarCloudFeedback {
 
   private log(message: string = ''): void {
     if (this.jsonMode) {
-      console.error(message);
       return;
     }
     console.log(message);
   }
 
   private logError(message: string = ''): void {
+    if (this.jsonMode) {
+      return;
+    }
     console.error(message);
   }
 
