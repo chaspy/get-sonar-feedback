@@ -14,6 +14,7 @@ A CLI tool to fetch SonarCloud feedback for pull requests and project-wide analy
 - 🔄 Code duplication metrics
 - 📊 Test coverage reporting
 - 🔍 Auto-detect PR number from current git branch
+- 📦 JSON output for automation (`--json`)
 
 ### 📊 Project-wide Analysis  
 - 📊 **Project metrics**: Get comprehensive quality metrics for any branch
@@ -44,6 +45,12 @@ get-sonar-feedback pr 123
 
 # Auto-detect PR from current branch
 get-sonar-feedback pr
+
+# JSON output
+get-sonar-feedback pr 123 --json
+
+# JSON output to file (still prints to stdout)
+get-sonar-feedback pr 123 --json --output /tmp/sonar-feedback.json
 ```
 
 ### Project Metrics
@@ -53,6 +60,9 @@ get-sonar-feedback metrics
 
 # Get metrics for specific branch
 get-sonar-feedback metrics -b develop
+
+# JSON output
+get-sonar-feedback metrics --json
 ```
 
 ### Issues Analysis
@@ -68,6 +78,9 @@ get-sonar-feedback issues --limit 50
 
 # Show all detailed issues
 get-sonar-feedback issues --all
+
+# JSON output
+get-sonar-feedback issues --json
 ```
 
 ## Configuration
@@ -194,6 +207,57 @@ Project Metrics for branch: main
 ==========================================
 Metrics Complete
 ==========================================
+```
+
+## JSON Output
+
+Use `--json` to emit machine-readable output to stdout only. Log messages are suppressed in JSON mode.
+Use `--output <path>` to write the same JSON to a file.
+
+```bash
+get-sonar-feedback pr 123 --json
+```
+
+Example (truncated):
+
+```json
+{
+  "meta": {
+    "projectKey": "my-org_my-project",
+    "organization": "my-org",
+    "branch": "main",
+    "pullRequest": "123",
+    "generatedAt": "2025-12-26T12:34:56.789Z"
+  },
+  "issues": [
+    {
+      "key": "AY1234567890",
+      "rule": "typescript:S1234",
+      "severity": "MINOR",
+      "type": "CODE_SMELL",
+      "component": "my-org_my-project:src/index.ts",
+      "filePath": "src/index.ts",
+      "line": 42,
+      "message": "Remove this unused variable",
+      "effort": "5min",
+      "debt": "5min",
+      "tags": ["unused"],
+      "creationDate": "2025-12-25T01:02:03+0000",
+      "updateDate": "2025-12-25T01:02:03+0000"
+    }
+  ],
+  "metrics": {
+    "coverage": 85.5,
+    "ncloc": 38760,
+    "complexity": 5624,
+    "reliability_rating": 1,
+    "security_rating": 1,
+    "sqale_rating": 1,
+    "new_coverage": 90.1,
+    "new_lines_to_cover": 200,
+    "new_uncovered_lines": 20
+  }
+}
 ```
 
 ## Development
