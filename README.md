@@ -145,6 +145,11 @@ Example (truncated):
   ],
   "metrics": {
     "coverage": 85.5,
+    "ncloc": 38760,
+    "complexity": 5624,
+    "reliability_rating": 1,
+    "security_rating": 1,
+    "sqale_rating": 1,
     "new_coverage": 90.1,
     "new_lines_to_cover": 200,
     "new_uncovered_lines": 20
