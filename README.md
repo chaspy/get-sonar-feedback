@@ -109,7 +109,7 @@ Analysis Complete
 
 ## JSON Output
 
-Use `--json` to emit machine-readable output to stdout only.
+Use `--json` to emit machine-readable output to stdout only. Log messages are suppressed in JSON mode.
 
 ```bash
 get-sonar-feedback --json

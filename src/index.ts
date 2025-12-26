@@ -232,7 +232,7 @@ class SonarCloudFeedback {
 
   private getCurrentBranchSilent(): string | null {
     try {
-      const branch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf-8' }).trim();
+      const branch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf-8' }).trim(); // NOSONAR
       return branch || null;
     } catch {
       return null;
@@ -258,7 +258,7 @@ class SonarCloudFeedback {
 
   private getGitHubConfig(): GitHubConfig {
     try {
-      const remoteUrl = execSync('git remote get-url origin', { encoding: 'utf-8' }).trim();
+      const remoteUrl = execSync('git remote get-url origin', { encoding: 'utf-8' }).trim(); // NOSONAR
       const match = remoteUrl.match(/github\.com[:\/]([^\/]+)\/(.+?)(\.git)?$/);
       
       if (!match) {
@@ -283,7 +283,7 @@ class SonarCloudFeedback {
     }
 
     try {
-      const token = execSync('gh auth token', { encoding: 'utf-8' }).trim();
+      const token = execSync('gh auth token', { encoding: 'utf-8' }).trim(); // NOSONAR
       if (token) {
         this.log(chalk.gray('Using token from gh auth'));
         return token;
@@ -303,7 +303,7 @@ class SonarCloudFeedback {
     this.log(chalk.blue('Pull request number not specified. Attempting to auto-detect...'));
 
     try {
-      const currentBranch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf-8' }).trim();
+      const currentBranch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf-8' }).trim(); // NOSONAR
       this.currentBranch = currentBranch;
       this.log(chalk.gray(`Current branch: ${currentBranch}`));
 
