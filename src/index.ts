@@ -176,7 +176,7 @@ interface JsonError {
   error: {
     message: string;
     statusCode: number | null;
-    details: unknown | null;
+    details: unknown;
   };
 }
 
@@ -385,7 +385,7 @@ class SonarCloudFeedback {
       message: issue.message,
       effort: issue.effort ?? null,
       debt: issue.debt ?? null,
-      tags: issue.tags || [],
+      tags: issue.tags ?? [],
       creationDate: issue.creationDate ?? null,
       updateDate: issue.updateDate ?? null,
     };
@@ -395,7 +395,7 @@ class SonarCloudFeedback {
     const result: Record<string, number | null> = {};
     metrics.forEach((metric) => {
       const value = parseMeasureNumber(measures, metric);
-      result[metric] = value === undefined ? null : value;
+      result[metric] = value ?? null;
     });
     return result;
   }
@@ -440,7 +440,7 @@ class SonarCloudFeedback {
         )
       );
       missingVars.forEach((varName) => {
-        this.error(chalk.yellow(`  export ${varName}=\"your-value\"`));
+        this.error(chalk.yellow(`  export ${varName}="your-value"`));
       });
       process.exit(1);
     }
