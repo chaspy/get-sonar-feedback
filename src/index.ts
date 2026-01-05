@@ -206,17 +206,17 @@ class SonarCloudFeedback {
 
   private log(...args: unknown[]): void {
     if (this.jsonMode) return;
-    this.log(...args);
+    console.log(...args);
   }
 
   private warn(...args: unknown[]): void {
     if (this.jsonMode) return;
-    this.warn(...args);
+    console.warn(...args);
   }
 
   private error(...args: unknown[]): void {
     if (this.jsonMode) return;
-    this.error(...args);
+    console.error(...args);
   }
 
   private isDebugMode(): boolean {
