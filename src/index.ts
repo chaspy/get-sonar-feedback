@@ -12,6 +12,14 @@ import {
   ComponentTreeResponse,
   extractCoverageFileDetails,
 } from "./coverage-utils";
+import {
+  buildDuplicationBlocksUrl,
+  buildDuplicationFileDetailsUrl,
+  DuplicationBlocksResponse,
+  DuplicationComponentTreeResponse,
+  extractDuplicationBlocks,
+  extractDuplicationFileSummaries,
+} from "./duplication-utils";
 import { parseMeasureNumber } from "./measure-utils";
 
 interface SonarConfig {
@@ -148,6 +156,31 @@ interface JsonIssuesSummary {
   debtTotal: number;
 }
 
+interface JsonDuplicationBlock {
+  startLine: number;
+  endLine: number;
+  otherFilePath: string;
+  otherStartLine: number;
+  otherEndLine: number;
+  sameFile: boolean;
+  displayText: string;
+}
+
+interface JsonDuplicationFile {
+  key: string;
+  path: string;
+  newDuplicatedLinesDensity: number;
+  duplicatedLines: number;
+  blocks: JsonDuplicationBlock[];
+}
+
+interface JsonDuplication {
+  newDuplicatedLinesDensity: number | null;
+  newDuplicatedLines: number | null;
+  newDuplicatedBlocks: number | null;
+  files: JsonDuplicationFile[];
+}
+
 interface JsonPrOutput {
   meta: JsonMeta;
   qualityGate: JsonQualityGate;
@@ -157,7 +190,7 @@ interface JsonPrOutput {
     total: number;
     hotspots: JsonSecurityHotspot[];
   };
-  duplication: Record<string, number | null>;
+  duplication: JsonDuplication;
   metrics: Record<string, number | null>;
 }
 
@@ -398,6 +431,14 @@ class SonarCloudFeedback {
       result[metric] = value ?? null;
     });
     return result;
+  }
+
+  private hasDuplicationFailure(qualityGate: JsonQualityGate): boolean {
+    return qualityGate.conditions.some(
+      (condition) =>
+        condition.status === "ERROR" &&
+        condition.metricKey === "new_duplicated_lines_density"
+    );
   }
 
   private handleError(error: unknown): void {
@@ -771,7 +812,10 @@ class SonarCloudFeedback {
     };
   }
 
-  private async fetchDuplicationMetrics(prId: string): Promise<Record<string, number | null>> {
+  private async fetchDuplicationMetrics(
+    prId: string,
+    includeDetails: boolean
+  ): Promise<JsonDuplication> {
     this.log(chalk.bold("\n🔄 Code Duplication"));
     this.log("-".repeat(50));
 
@@ -804,7 +848,93 @@ class SonarCloudFeedback {
       }
     });
 
-    return this.buildMetricsMap(metrics, data.component.measures);
+    const summary: JsonDuplication = {
+      newDuplicatedLinesDensity:
+        parseMeasureNumber(data.component.measures, "new_duplicated_lines_density") ?? null,
+      newDuplicatedLines:
+        parseMeasureNumber(data.component.measures, "new_duplicated_lines") ?? null,
+      newDuplicatedBlocks:
+        parseMeasureNumber(data.component.measures, "new_duplicated_blocks") ?? null,
+      files: [],
+    };
+
+    if (includeDetails) {
+      summary.files = await this.fetchDuplicationFileDetails(prId);
+      if (summary.files.length > 0) {
+        this.log("");
+        this.log("Files with new duplication:");
+        summary.files.forEach((file) => {
+          this.log(`- ${file.path}`);
+          this.log(
+            `  - new_duplicated_lines_density: ${file.newDuplicatedLinesDensity.toFixed(2)}%`
+          );
+          this.log(`  - duplicated_lines: ${file.duplicatedLines}`);
+          if (file.blocks.length === 0) {
+            this.log("  - duplicated block: unavailable");
+            return;
+          }
+          file.blocks.forEach((block) => {
+            this.log(`  - duplicated block: ${block.displayText}`);
+          });
+        });
+      }
+    }
+
+    return summary;
+  }
+
+  private async fetchDuplicationFileDetails(
+    prId: string
+  ): Promise<JsonDuplicationFile[]> {
+    const url = buildDuplicationFileDetailsUrl(
+      this.sonarConfig.projectKey,
+      this.sonarConfig.organization,
+      prId,
+      SonarCloudFeedback.COMPONENT_TREE_PAGE_SIZE
+    );
+    this.logApiUrl("Duplication File Details", url);
+
+    const data = await this.fetchJson<DuplicationComponentTreeResponse>(
+      url,
+      this.getSonarAuthHeader(),
+      "Duplication File Details"
+    );
+    const summaries = extractDuplicationFileSummaries(
+      data,
+      this.sonarConfig.projectKey
+    );
+
+    const files: JsonDuplicationFile[] = [];
+    for (const summary of summaries) {
+      const blocksUrl = buildDuplicationBlocksUrl(summary.key);
+      this.logApiUrl(`Duplication Blocks (${summary.path})`, blocksUrl);
+      const blocksData = await this.fetchJson<DuplicationBlocksResponse>(
+        blocksUrl,
+        this.getSonarAuthHeader(),
+        `Duplication Blocks (${summary.path})`
+      );
+      const blocks = extractDuplicationBlocks(blocksData, summary.key).map(
+        (block) => ({
+          startLine: block.range.startLine,
+          endLine: block.range.endLine,
+          otherFilePath: block.otherFilePath,
+          otherStartLine: block.otherRange.startLine,
+          otherEndLine: block.otherRange.endLine,
+          sameFile: block.sameFile,
+          displayText: block.displayText,
+        })
+      );
+
+      files.push({
+        key: summary.key,
+        path: summary.path,
+        newDuplicatedLinesDensity: summary.newDuplicatedLinesDensity,
+        duplicatedLines: summary.duplicatedLines,
+        blocks,
+      });
+    }
+
+    return files;
   }
 
   private async fetchCoverageMetrics(prId: string): Promise<Record<string, number | null>> {
@@ -1222,9 +1352,13 @@ class SonarCloudFeedback {
       this.log(chalk.bold("=========================================="));
 
       const qualityGate = await this.fetchQualityGate(pullRequestId);
+      const duplicationDetailsRequired = this.hasDuplicationFailure(qualityGate);
       const issuesResult = await this.fetchIssues(pullRequestId);
       const hotspotsResult = await this.fetchSecurityHotspots(pullRequestId);
-      const duplicationMetrics = await this.fetchDuplicationMetrics(pullRequestId);
+      const duplicationMetrics = await this.fetchDuplicationMetrics(
+        pullRequestId,
+        duplicationDetailsRequired
+      );
       const coverageMetrics = await this.fetchCoverageMetrics(pullRequestId);
       const overallMetrics: Record<string, number | null> = this.jsonMode
         ? await this.fetchOverallMetrics()

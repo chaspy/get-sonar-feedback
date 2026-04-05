@@ -12,6 +12,7 @@ A CLI tool to fetch SonarCloud feedback for pull requests and project-wide analy
 - 🐛 Code issues detection
 - 🔒 Security hotspots analysis
 - 🔄 Code duplication metrics
+- 🔎 File-level and line-level duplication details when `new_duplicated_lines_density` fails
 - 📊 Test coverage reporting
 - 🔍 Auto-detect PR number from current git branch
 - 📦 JSON output for automation (`--json`)
