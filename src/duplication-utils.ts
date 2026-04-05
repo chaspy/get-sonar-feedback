@@ -67,9 +67,15 @@ export function buildDuplicationFileDetailsUrl(
   return url.toString();
 }
 
-export function buildDuplicationBlocksUrl(componentKey: string): string {
+export function buildDuplicationBlocksUrl(
+  componentKey: string,
+  pullRequestId?: string
+): string {
   const url = new URL("https://sonarcloud.io/api/duplications/show");
   url.searchParams.set("key", componentKey);
+  if (pullRequestId) {
+    url.searchParams.set("pullRequest", pullRequestId);
+  }
   return url.toString();
 }
 

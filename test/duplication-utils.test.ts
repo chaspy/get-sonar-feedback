@@ -134,12 +134,16 @@ assert.strictEqual(treeParams.get("qualifiers"), "FIL");
 assert.strictEqual(treeParams.get("metricPeriod"), "1");
 assert.strictEqual(treeParams.get("ps"), "500");
 
-const duplicationUrl = buildDuplicationBlocksUrl("example-project:src/duplicated.ts");
+const duplicationUrl = buildDuplicationBlocksUrl(
+  "example-project:src/duplicated.ts",
+  "123"
+);
 const duplicationParsed = new URL(duplicationUrl);
 assert.strictEqual(duplicationParsed.pathname, "/api/duplications/show");
 assert.strictEqual(
   duplicationParsed.searchParams.get("key"),
   "example-project:src/duplicated.ts"
 );
+assert.strictEqual(duplicationParsed.searchParams.get("pullRequest"), "123");
 
 console.log("duplication-utils tests passed");

@@ -906,7 +906,7 @@ class SonarCloudFeedback {
 
     const files: JsonDuplicationFile[] = [];
     for (const summary of summaries) {
-      const blocksUrl = buildDuplicationBlocksUrl(summary.key);
+      const blocksUrl = buildDuplicationBlocksUrl(summary.key, prId);
       this.logApiUrl(`Duplication Blocks (${summary.path})`, blocksUrl);
       const blocksData = await this.fetchJson<DuplicationBlocksResponse>(
         blocksUrl,
