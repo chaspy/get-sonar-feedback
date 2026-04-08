@@ -29,7 +29,7 @@
     "url": "https://github.com/chaspy/get-sonar-feedback/issues"
   },
   "dependencies": {
-    "commander": "^11.1.0",
+    "commander": "^14.0.0",
     "node-fetch": "^2.7.0",
     "chalk": "^4.1.2"
   },
